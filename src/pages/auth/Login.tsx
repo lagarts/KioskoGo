@@ -30,20 +30,22 @@ export function Login() {
   };
 
   return (
-    <div className="min-h-screen bg-surface-950 flex items-center justify-center p-4">
-      <div className="w-full max-w-md">
+    <div className="min-h-screen bg-surface-950 flex flex-col items-center justify-center p-4">
+      <div className="w-full max-w-sm">
         {/* Logo */}
-        <div className="text-center mb-8">
-          <div className="w-16 h-16 rounded-2xl bg-kiosko-600 flex items-center justify-center mx-auto mb-4">
-            <ShoppingCart size={32} className="text-black" />
-          </div>
-          <h1 className="text-3xl font-bold text-kiosko-500">KioskoGo</h1>
-          <p className="text-surface-400 mt-2">Sistema de gestión y punto de venta</p>
+        <div className="flex flex-col items-center mb-8">
+          <img
+            src="/logo2.png"
+            alt="KioskoGo"
+            className="w-28 h-28 object-contain mb-5 drop-shadow-2xl"
+          />
+          <h1 className="text-4xl font-extrabold text-kiosko-500 tracking-tight">KioskoGo</h1>
+          <p className="text-surface-400 mt-2 text-sm">Sistema de gestión y punto de venta</p>
         </div>
 
         {/* Form */}
-        <div className="bg-surface-900 border border-surface-800 rounded-2xl p-6 md:p-8">
-          <h2 className="text-xl font-semibold text-white mb-6">Iniciar sesión</h2>
+        <div className="bg-surface-900 border border-surface-800 rounded-2xl p-6 shadow-xl">
+          <h2 className="text-lg font-semibold text-white mb-5">Iniciar sesión</h2>
 
           {error && (
             <div className="bg-red-900/30 border border-red-800 text-red-400 text-sm px-4 py-3 rounded-lg mb-4">
@@ -96,7 +98,7 @@ export function Login() {
             </Button>
           </form>
 
-          <div className="mt-6 text-center">
+          <div className="mt-5 pt-4 border-t border-surface-800 text-center">
             <p className="text-sm text-surface-500">
               ¿No tenés cuenta?{' '}
               <button className="text-kiosko-500 hover:text-kiosko-400 font-medium">

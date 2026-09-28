@@ -99,16 +99,12 @@ export function Sidebar({ collapsed, onToggle, mobileOpen, onMobileClose }: Side
       <div className={`flex items-center ${collapsed ? 'justify-center' : 'justify-between'} px-4 h-16 border-b border-surface-800`}>
         {!collapsed && (
           <div className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded-lg bg-kiosko-600 flex items-center justify-center">
-              <ShoppingCart size={18} className="text-black" />
-            </div>
+            <img src="/logo2.png" alt="KioskoGo" className="w-8 h-8 object-contain" />
             <span className="text-lg font-bold text-kiosko-500">KioskoGo</span>
           </div>
         )}
         {collapsed && (
-          <div className="w-8 h-8 rounded-lg bg-kiosko-600 flex items-center justify-center">
-            <ShoppingCart size={18} className="text-black" />
-          </div>
+          <img src="/logo2.png" alt="KioskoGo" className="w-8 h-8 object-contain" />
         )}
         {/* Mobile close */}
         <button

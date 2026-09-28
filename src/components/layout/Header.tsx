@@ -95,8 +95,8 @@ export function Header({ onMenuClick }: HeaderProps) {
             }}
             className="flex items-center gap-2 p-1.5 rounded-lg hover:bg-surface-800 transition-colors"
           >
-            <div className="w-8 h-8 rounded-lg bg-kiosko-600 flex items-center justify-center">
-              <ShoppingCart size={16} className="text-black" />
+            <div className="w-8 h-8 rounded-lg overflow-hidden flex items-center justify-center">
+              <img src="/logo2.png" alt="KioskoGo" className="w-full h-full object-contain" />
             </div>
             <div className="hidden md:block text-left">
               <p className="text-sm font-medium text-white leading-tight">{user?.name}</p>
