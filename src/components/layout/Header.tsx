@@ -1,25 +1,70 @@
-import { useState } from 'react';
-import { Menu, Bell, Search, ChevronDown, ShoppingCart } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { Menu, Bell, Search, ChevronDown } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
+import { listNotifications, markNotificationRead } from '../../services/notifications.service';
+import { formatTime } from '../../utils/format';
+import type { Notification } from '../../types';
 
 interface HeaderProps {
   onMenuClick: () => void;
 }
 
-const mockNotifications = [
-  { id: '1', title: 'Stock bajo', message: 'Coca Cola 500ml tiene menos de 5 unidades', type: 'stock', time: 'Hace 5 min' },
-  { id: '2', title: 'Caja abierta', message: 'La caja fue abierta por Admin', type: 'cash', time: 'Hace 10 min' },
-  { id: '3', title: 'Venta realizada', message: 'Venta #1024 por $4.500', type: 'sale', time: 'Hace 15 min' },
-];
+const roleLabels: Record<string, string> = {
+  admin: 'Administrador',
+  encargado: 'Encargado',
+  cajero: 'Cajero',
+};
 
 export function Header({ onMenuClick }: HeaderProps) {
-  const { user } = useAuth();
+  const { user, signOut } = useAuth();
+  const navigate = useNavigate();
   const [showNotifications, setShowNotifications] = useState(false);
   const [showUserMenu, setShowUserMenu] = useState(false);
+  const [notifications, setNotifications] = useState<Notification[]>([]);
+
+  useEffect(() => {
+    let active = true;
+    listNotifications()
+      .then((items) => {
+        if (active) setNotifications(items);
+      })
+      .catch(() => {
+        if (active) setNotifications([]);
+      });
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  const unreadCount = notifications.filter((notif) => !notif.read).length;
+  const roleLabel = user ? (roleLabels[user.role] ?? user.role) : '';
+
+  const handleNotificationClick = async (notif: Notification) => {
+    if (notif.read) return;
+    try {
+      await markNotificationRead(notif.id);
+      setNotifications((prev) =>
+        prev.map((n) => (n.id === notif.id ? { ...n, read: true } : n)),
+      );
+    } catch {
+      return;
+    }
+  };
+
+  const handleSettings = () => {
+    setShowUserMenu(false);
+    navigate('/settings');
+  };
+
+  const handleSignOut = async () => {
+    setShowUserMenu(false);
+    await signOut().catch(() => undefined);
+    navigate('/login');
+  };
 
   return (
     <header className="h-16 bg-surface-950 border-b border-surface-800 flex items-center justify-between px-4 md:px-6 sticky top-0 z-20">
-      {/* Left side */}
       <div className="flex items-center gap-4">
         <button
           onClick={onMenuClick}
@@ -28,7 +73,6 @@ export function Header({ onMenuClick }: HeaderProps) {
           <Menu size={24} />
         </button>
 
-        {/* Search */}
         <div className="hidden md:flex items-center bg-surface-900 border border-surface-800 rounded-lg px-3 py-2 w-64 lg:w-96">
           <Search size={16} className="text-surface-500 mr-2" />
           <input
@@ -39,9 +83,7 @@ export function Header({ onMenuClick }: HeaderProps) {
         </div>
       </div>
 
-      {/* Right side */}
       <div className="flex items-center gap-2 md:gap-4">
-        {/* Notifications */}
         <div className="relative">
           <button
             onClick={() => {
@@ -51,9 +93,9 @@ export function Header({ onMenuClick }: HeaderProps) {
             className="relative p-2 rounded-lg text-surface-400 hover:bg-surface-800 hover:text-white transition-colors"
           >
             <Bell size={20} />
-            {mockNotifications.length > 0 && (
+            {unreadCount > 0 && (
               <span className="absolute -top-0.5 -right-0.5 w-5 h-5 bg-kiosko-600 text-black text-[10px] font-bold rounded-full flex items-center justify-center">
-                {mockNotifications.length}
+                {unreadCount}
               </span>
             )}
           </button>
@@ -64,29 +106,36 @@ export function Header({ onMenuClick }: HeaderProps) {
                 <h3 className="text-sm font-semibold text-white">Notificaciones</h3>
               </div>
               <div className="max-h-80 overflow-y-auto">
-                {mockNotifications.map((notif) => (
-                  <div
-                    key={notif.id}
-                    className="px-4 py-3 border-b border-surface-800/50 hover:bg-surface-800/50 cursor-pointer transition-colors"
-                  >
-                    <div className="flex justify-between items-start">
-                      <p className="text-sm font-medium text-white">{notif.title}</p>
-                      <span className="text-[10px] text-surface-500">{notif.time}</span>
+                {notifications.length === 0 ? (
+                  <p className="px-4 py-6 text-sm text-surface-500 text-center">Sin notificaciones</p>
+                ) : (
+                  notifications.map((notif) => (
+                    <div
+                      key={notif.id}
+                      onClick={() => {
+                        if (!notif.read) {
+                          handleNotificationClick(notif);
+                        }
+                      }}
+                      className={`px-4 py-3 border-b border-surface-800/50 transition-colors ${
+                        notif.read
+                          ? 'hover:bg-surface-800/50 cursor-default'
+                          : 'hover:bg-surface-800/50 cursor-pointer'
+                      }`}
+                    >
+                      <div className="flex justify-between items-start gap-2">
+                        <p className="text-sm font-medium text-white">{notif.title}</p>
+                        <span className="text-[10px] text-surface-500 shrink-0">{formatTime(notif.created_at)}</span>
+                      </div>
+                      <p className="text-xs text-surface-400 mt-0.5">{notif.message}</p>
                     </div>
-                    <p className="text-xs text-surface-400 mt-0.5">{notif.message}</p>
-                  </div>
-                ))}
-              </div>
-              <div className="px-4 py-2 text-center border-t border-surface-800">
-                <button className="text-xs text-kiosko-500 hover:text-kiosko-400 font-medium">
-                  Ver todas las notificaciones
-                </button>
+                  ))
+                )}
               </div>
             </div>
           )}
         </div>
 
-        {/* User */}
         <div className="relative">
           <button
             onClick={() => {
@@ -100,7 +149,7 @@ export function Header({ onMenuClick }: HeaderProps) {
             </div>
             <div className="hidden md:block text-left">
               <p className="text-sm font-medium text-white leading-tight">{user?.name}</p>
-              <p className="text-[11px] text-surface-500 leading-tight">Admin</p>
+              <p className="text-[11px] text-surface-500 leading-tight">{roleLabel}</p>
             </div>
             <ChevronDown size={14} className="hidden md:block text-surface-500" />
           </button>
@@ -112,13 +161,16 @@ export function Header({ onMenuClick }: HeaderProps) {
                 <p className="text-xs text-surface-500">{user?.email}</p>
               </div>
               <div className="py-1">
-                <button className="w-full px-4 py-2 text-sm text-left text-surface-300 hover:bg-surface-800">
-                  Mi perfil
-                </button>
-                <button className="w-full px-4 py-2 text-sm text-left text-surface-300 hover:bg-surface-800">
+                <button
+                  onClick={handleSettings}
+                  className="w-full px-4 py-2 text-sm text-left text-surface-300 hover:bg-surface-800"
+                >
                   Configuración
                 </button>
-                <button className="w-full px-4 py-2 text-sm text-left text-red-400 hover:bg-red-900/20">
+                <button
+                  onClick={handleSignOut}
+                  className="w-full px-4 py-2 text-sm text-left text-red-400 hover:bg-red-900/20"
+                >
                   Cerrar sesión
                 </button>
               </div>
@@ -127,7 +179,6 @@ export function Header({ onMenuClick }: HeaderProps) {
         </div>
       </div>
 
-      {/* Click outside to close */}
       {(showNotifications || showUserMenu) && (
         <div
           className="fixed inset-0 z-40"

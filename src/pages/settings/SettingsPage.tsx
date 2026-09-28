@@ -1,11 +1,50 @@
-import { useState } from 'react';
-import { Settings, Store, Users, CreditCard, Printer, Scale, Barcode, Ticket, Wallet, Package, Bell, Shield, Smartphone, Palette, Globe, Lock, HardDrive } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import {
+  Settings,
+  Store,
+  Users,
+  CreditCard,
+  Printer,
+  Scale,
+  Barcode,
+  Ticket,
+  Wallet,
+  Package,
+  Bell,
+  Shield,
+  Smartphone,
+  Lock,
+  HardDrive,
+} from 'lucide-react';
 import { Card } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
 import { Badge } from '../../components/ui/Badge';
 import { Input } from '../../components/ui/Input';
+import { useAuth } from '../../contexts/AuthContext';
+import {
+  getBusiness,
+  updateBusiness,
+  getSubscription,
+  listBusinessUsers,
+  type BusinessInput,
+} from '../../services/business.service';
+import { formatDate } from '../../utils/format';
+import type { RubroType, Subscription, User, UserRole } from '../../types';
 
-type SettingsSection = 'business' | 'users' | 'roles' | 'subscription' | 'payment-methods' | 'hardware' | 'labels' | 'tickets' | 'cash' | 'stock' | 'notifications' | 'pwa' | 'security';
+type SettingsSection =
+  | 'business'
+  | 'users'
+  | 'roles'
+  | 'subscription'
+  | 'payment-methods'
+  | 'hardware'
+  | 'labels'
+  | 'tickets'
+  | 'cash'
+  | 'stock'
+  | 'notifications'
+  | 'pwa'
+  | 'security';
 
 const menuItems: { section: SettingsSection; label: string; icon: React.ReactNode }[] = [
   { section: 'business', label: 'Mi Comercio', icon: <Store size={18} /> },
@@ -23,34 +62,142 @@ const menuItems: { section: SettingsSection; label: string; icon: React.ReactNod
   { section: 'security', label: 'Seguridad', icon: <Lock size={18} /> },
 ];
 
+const rubros: { value: RubroType; label: string }[] = [
+  { value: 'kiosco', label: 'Kiosco' },
+  { value: 'almacen', label: 'Almacén' },
+  { value: 'supermercado', label: 'Supermercado' },
+  { value: 'carniceria', label: 'Carnicería' },
+  { value: 'panaderia', label: 'Panadería' },
+  { value: 'dietetica', label: 'Dietética' },
+  { value: 'despensa', label: 'Despensa' },
+  { value: 'fiambre', label: 'Fiambrería' },
+  { value: 'verduleria', label: 'Verdulería' },
+  { value: 'otro', label: 'Otro' },
+];
+
+const roleLabels: Record<UserRole, string> = {
+  admin: 'Administrador',
+  encargado: 'Encargado',
+  cajero: 'Cajero',
+};
+
 function BusinessSection() {
+  const { user } = useAuth();
+  const [form, setForm] = useState<BusinessInput>({
+    name: '',
+    rubro: 'otro',
+    phone: '',
+    email: '',
+    address: '',
+    cuit: '',
+  });
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [message, setMessage] = useState('');
+
+  useEffect(() => {
+    if (!user?.business_id) return;
+    (async () => {
+      try {
+        const business = await getBusiness(user.business_id);
+        if (business) {
+          setForm({
+            name: business.name,
+            rubro: business.rubro,
+            phone: business.phone ?? '',
+            email: business.email ?? '',
+            address: business.address ?? '',
+            cuit: business.cuit ?? '',
+          });
+        }
+      } catch (err) {
+        setMessage(err instanceof Error ? err.message : 'Error cargando el comercio');
+      } finally {
+        setLoading(false);
+      }
+    })();
+  }, [user?.business_id]);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!user?.business_id || saving) return;
+    setSaving(true);
+    setMessage('');
+    try {
+      await updateBusiness(user.business_id, form);
+      setMessage('Cambios guardados');
+    } catch (err) {
+      setMessage(err instanceof Error ? err.message : 'No se pudieron guardar los cambios');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  if (loading) {
+    return <p className="text-sm text-surface-400">Cargando comercio...</p>;
+  }
+
   return (
-    <div className="space-y-4">
+    <form onSubmit={handleSubmit} className="space-y-4">
       <h2 className="text-xl font-bold text-white">Mi Comercio</h2>
+      {message && (
+        <div
+          className={`text-sm px-4 py-3 rounded-lg border ${
+            message === 'Cambios guardados'
+              ? 'bg-green-900/30 border-green-800 text-green-400'
+              : 'bg-red-900/30 border-red-800 text-red-400'
+          }`}
+        >
+          {message}
+        </div>
+      )}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <Input label="Nombre comercial" defaultValue="Kiosco Don Carlos" />
+        <Input
+          label="Nombre comercial"
+          value={form.name}
+          onChange={(e) => setForm({ ...form, name: e.target.value })}
+          required
+        />
         <div>
           <label className="block text-sm font-medium text-surface-300 mb-1.5">Rubro</label>
-          <select defaultValue="kiosco" className="w-full bg-surface-800 border border-surface-700 rounded-lg px-4 py-2.5 text-white outline-none">
-            <option value="kiosco">Kiosco</option>
-            <option value="almacen">Almacén</option>
-            <option value="supermercado">Supermercado</option>
-            <option value="carniceria">Carnicería</option>
-            <option value="panaderia">Panadería</option>
-            <option value="dietetica">Dietética</option>
-            <option value="despensa">Despensa</option>
-            <option value="fiambre">Fiambrería</option>
-            <option value="verduleria">Verdulería</option>
-            <option value="otro">Otro</option>
+          <select
+            value={form.rubro}
+            onChange={(e) => setForm({ ...form, rubro: e.target.value as RubroType })}
+            className="w-full bg-surface-800 border border-surface-700 rounded-lg px-4 py-2.5 text-white outline-none"
+          >
+            {rubros.map((r) => (
+              <option key={r.value} value={r.value}>
+                {r.label}
+              </option>
+            ))}
           </select>
         </div>
-        <Input label="Teléfono" defaultValue="11-5555-0000" />
-        <Input label="Email" type="email" defaultValue="contacto@doncarlos.com" />
-        <Input label="Dirección" defaultValue="Av. San Martín 1234" />
-        <Input label="CUIT" defaultValue="20-30123456-7" />
+        <Input
+          label="Teléfono"
+          value={form.phone ?? ''}
+          onChange={(e) => setForm({ ...form, phone: e.target.value })}
+        />
+        <Input
+          label="Email"
+          type="email"
+          value={form.email ?? ''}
+          onChange={(e) => setForm({ ...form, email: e.target.value })}
+        />
+        <Input
+          label="Dirección"
+          value={form.address ?? ''}
+          onChange={(e) => setForm({ ...form, address: e.target.value })}
+        />
+        <Input
+          label="CUIT"
+          value={form.cuit ?? ''}
+          onChange={(e) => setForm({ ...form, cuit: e.target.value })}
+        />
       </div>
-      <Button>Guardar cambios</Button>
-    </div>
+      <Button type="submit" disabled={saving}>
+        {saving ? 'Guardando...' : 'Guardar cambios'}
+      </Button>
+    </form>
   );
 }
 
@@ -67,7 +214,6 @@ function HardwareSection() {
       <p className="text-sm text-surface-400">Configura los dispositivos conectados a tu sistema POS</p>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        {/* Scanner */}
         <Card>
           <div className="flex items-start justify-between mb-4">
             <div className="flex items-center gap-3">
@@ -91,7 +237,6 @@ function HardwareSection() {
           </Button>
         </Card>
 
-        {/* Printer */}
         <Card>
           <div className="flex items-start justify-between mb-4">
             <div className="flex items-center gap-3">
@@ -119,7 +264,6 @@ function HardwareSection() {
           </Button>
         </Card>
 
-        {/* Scale */}
         <Card>
           <div className="flex items-start justify-between mb-4">
             <div className="flex items-center gap-3">
@@ -147,7 +291,6 @@ function HardwareSection() {
           </Button>
         </Card>
 
-        {/* Label Printer */}
         <Card>
           <div className="flex items-start justify-between mb-4">
             <div className="flex items-center gap-3">
@@ -174,36 +317,96 @@ function HardwareSection() {
 }
 
 function SubscriptionSection() {
+  const { user } = useAuth();
+  const [subscription, setSubscription] = useState<Subscription | null>(null);
+  const [trialDaysLeft, setTrialDaysLeft] = useState<number | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    if (!user?.business_id) return;
+    (async () => {
+      try {
+        const sub = await getSubscription(user.business_id);
+        setSubscription(sub);
+        if (sub?.trial_end) {
+          const diff = new Date(sub.trial_end).getTime() - Date.now();
+          setTrialDaysLeft(Math.max(0, Math.ceil(diff / (1000 * 60 * 60 * 24))));
+        }
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'Error cargando suscripción');
+      } finally {
+        setLoading(false);
+      }
+    })();
+  }, [user?.business_id]);
+
+  const statusLabels: Record<string, { label: string; variant: 'success' | 'warning' | 'danger' | 'info' }> = {
+    trial: { label: 'Período de prueba', variant: 'warning' },
+    active: { label: 'Activo', variant: 'success' },
+    past_due: { label: 'Pago pendiente', variant: 'warning' },
+    expired: { label: 'Vencido', variant: 'danger' },
+    cancelled: { label: 'Cancelado', variant: 'danger' },
+    blocked: { label: 'Bloqueado', variant: 'danger' },
+  };
+
   return (
     <div className="space-y-4">
       <h2 className="text-xl font-bold text-white">Suscripción</h2>
-      <Card>
-        <div className="flex items-center justify-between mb-4">
-          <div>
-            <h3 className="font-semibold text-white">Plan actual</h3>
-            <p className="text-sm text-surface-400">Período de prueba gratuito</p>
-          </div>
-          <Badge variant="success">Activo</Badge>
+      {loading && <p className="text-sm text-surface-400">Cargando suscripción...</p>}
+      {error && (
+        <div className="bg-red-900/30 border border-red-800 text-red-400 text-sm px-4 py-3 rounded-lg">
+          {error}
         </div>
-        <div className="grid grid-cols-2 gap-4 text-sm">
-          <div>
-            <p className="text-surface-400">Inicio del trial</p>
-            <p className="text-white font-medium">15/06/2026</p>
+      )}
+      {!loading && !error && !subscription && (
+        <Card>
+          <p className="text-sm text-surface-400">
+            Este comercio todavía no tiene una suscripción registrada.
+          </p>
+        </Card>
+      )}
+      {subscription && (
+        <Card>
+          <div className="flex items-center justify-between mb-4">
+            <div>
+              <h3 className="font-semibold text-white">Plan actual</h3>
+              <p className="text-sm text-surface-400">
+                {subscription.plan === 'free_trial' ? 'Período de prueba gratuito' : 'Plan mensual'}
+              </p>
+            </div>
+            <Badge variant={statusLabels[subscription.status]?.variant ?? 'info'}>
+              {statusLabels[subscription.status]?.label ?? subscription.status}
+            </Badge>
           </div>
-          <div>
-            <p className="text-surface-400">Vencimiento</p>
-            <p className="text-white font-medium">15/09/2026</p>
+          <div className="grid grid-cols-2 gap-4 text-sm">
+            <div>
+              <p className="text-surface-400">Inicio</p>
+              <p className="text-white font-medium">
+                {subscription.trial_start ? formatDate(subscription.trial_start) : '—'}
+              </p>
+            </div>
+            <div>
+              <p className="text-surface-400">Vencimiento</p>
+              <p className="text-white font-medium">
+                {subscription.trial_end ? formatDate(subscription.trial_end) : '—'}
+              </p>
+            </div>
+            <div>
+              <p className="text-surface-400">Días restantes</p>
+              <p className="text-kiosko-500 font-bold">
+                {trialDaysLeft !== null ? `${trialDaysLeft} días` : '—'}
+              </p>
+            </div>
+            <div>
+              <p className="text-surface-400">Estado</p>
+              <Badge variant={statusLabels[subscription.status]?.variant ?? 'info'}>
+                {statusLabels[subscription.status]?.label ?? subscription.status}
+              </Badge>
+            </div>
           </div>
-          <div>
-            <p className="text-surface-400">Días restantes</p>
-            <p className="text-kiosko-500 font-bold">0 días</p>
-          </div>
-          <div>
-            <p className="text-surface-400">Estado</p>
-            <Badge variant="warning">Trial próximo a vencer</Badge>
-          </div>
-        </div>
-      </Card>
+        </Card>
+      )}
 
       <h3 className="text-lg font-semibold text-white">Planes disponibles</h3>
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -241,40 +444,72 @@ function SubscriptionSection() {
 }
 
 function UsersSection() {
-  const mockUsers = [
-    { name: 'Carlos García', email: 'carlos@doncarlos.com', role: 'Administrador', status: 'active' },
-    { name: 'María López', email: 'maria@doncarlos.com', role: 'Cajero', status: 'active' },
-    { name: 'Juan Pérez', email: 'juan@doncarlos.com', role: 'Encargado', status: 'active' },
-  ];
+  const { user } = useAuth();
+  const [users, setUsers] = useState<User[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    if (!user?.business_id) return;
+    (async () => {
+      try {
+        const list = await listBusinessUsers(user.business_id);
+        setUsers(list);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'Error cargando usuarios');
+      } finally {
+        setLoading(false);
+      }
+    })();
+  }, [user?.business_id]);
 
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <h2 className="text-xl font-bold text-white">Usuarios</h2>
-        <Button size="sm"><Users size={14} /> Nuevo usuario</Button>
+        <Button size="sm" disabled title="Próximamente">
+          <Users size={14} /> Nuevo usuario
+        </Button>
       </div>
-      <Card padding={false}>
-        <table className="w-full text-sm">
-          <thead>
-            <tr className="border-b border-surface-800">
-              <th className="text-left px-4 py-3 text-xs font-semibold text-surface-400 uppercase">Nombre</th>
-              <th className="text-left px-4 py-3 text-xs font-semibold text-surface-400 uppercase">Email</th>
-              <th className="text-left px-4 py-3 text-xs font-semibold text-surface-400 uppercase">Rol</th>
-              <th className="text-center px-4 py-3 text-xs font-semibold text-surface-400 uppercase">Estado</th>
-            </tr>
-          </thead>
-          <tbody>
-            {mockUsers.map((u) => (
-              <tr key={u.email} className="border-b border-surface-800/50">
-                <td className="px-4 py-3 font-medium text-white">{u.name}</td>
-                <td className="px-4 py-3 text-surface-300">{u.email}</td>
-                <td className="px-4 py-3"><Badge>{u.role}</Badge></td>
-                <td className="px-4 py-3 text-center"><Badge variant="success">Activo</Badge></td>
+      {error && (
+        <div className="bg-red-900/30 border border-red-800 text-red-400 text-sm px-4 py-3 rounded-lg">
+          {error}
+        </div>
+      )}
+      {loading ? (
+        <p className="text-sm text-surface-400">Cargando usuarios...</p>
+      ) : (
+        <Card padding={false}>
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b border-surface-800">
+                <th className="text-left px-4 py-3 text-xs font-semibold text-surface-400 uppercase">Nombre</th>
+                <th className="text-left px-4 py-3 text-xs font-semibold text-surface-400 uppercase">Email</th>
+                <th className="text-left px-4 py-3 text-xs font-semibold text-surface-400 uppercase">Rol</th>
+                <th className="text-center px-4 py-3 text-xs font-semibold text-surface-400 uppercase">Estado</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
-      </Card>
+            </thead>
+            <tbody>
+              {users.length === 0 ? (
+                <tr>
+                  <td colSpan={4} className="px-4 py-6 text-center text-surface-500">
+                    No hay usuarios cargados
+                  </td>
+                </tr>
+              ) : (
+                users.map((u) => (
+                  <tr key={u.id} className="border-b border-surface-800/50">
+                    <td className="px-4 py-3 font-medium text-white">{u.name}</td>
+                    <td className="px-4 py-3 text-surface-300">{u.email}</td>
+                    <td className="px-4 py-3"><Badge>{roleLabels[u.role]}</Badge></td>
+                    <td className="px-4 py-3 text-center"><Badge variant="success">Activo</Badge></td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </Card>
+      )}
     </div>
   );
 }
@@ -312,7 +547,6 @@ export function SettingsPage() {
       </div>
 
       <div className="flex flex-col lg:flex-row gap-6">
-        {/* Sidebar Menu */}
         <div className="lg:w-60 shrink-0">
           <Card className="lg:sticky lg:top-24">
             <nav className="space-y-1">
@@ -334,7 +568,6 @@ export function SettingsPage() {
           </Card>
         </div>
 
-        {/* Content */}
         <div className="flex-1 min-w-0">
           {renderSection()}
         </div>

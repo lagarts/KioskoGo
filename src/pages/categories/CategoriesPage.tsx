@@ -1,55 +1,74 @@
-import { useState } from 'react';
-import { Tag, Plus, Edit, Trash2, X, Palette } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { Tag, Plus, Edit, Trash2, X } from 'lucide-react';
 import { Card } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Input';
-
-interface Category {
-  id: string;
-  name: string;
-  icon: string;
-  color: string;
-  productCount: number;
-}
-
-const defaultCategories: Category[] = [
-  { id: '1', name: 'Bebidas', icon: '🥤', color: '#3B82F6', productCount: 3 },
-  { id: '2', name: 'Golosinas', icon: '🍬', color: '#EC4899', productCount: 3 },
-  { id: '3', name: 'Almacén', icon: '🏪', color: '#F59E0B', productCount: 3 },
-  { id: '4', name: 'Lácteos', icon: '🥛', color: '#10B981', productCount: 2 },
-  { id: '5', name: 'Panadería', icon: '🍞', color: '#D97706', productCount: 2 },
-  { id: '6', name: 'Carnicería', icon: '🥩', color: '#EF4444', productCount: 2 },
-  { id: '7', name: 'Limpieza', icon: '🧹', color: '#6366F1', productCount: 0 },
-  { id: '8', name: 'Dietética', icon: '🥗', color: '#22C55E', productCount: 0 },
-  { id: '9', name: 'Frescos', icon: '🍎', color: '#F97316', productCount: 0 },
-];
+import { useAuth } from '../../contexts/AuthContext';
+import {
+  listCategories,
+  createCategory,
+  updateCategory,
+  deleteCategory,
+  type CategoryWithCount,
+} from '../../services/categories.service';
 
 export function CategoriesPage() {
-  const [categories, setCategories] = useState<Category[]>(defaultCategories);
+  const { user } = useAuth();
+  const [categories, setCategories] = useState<CategoryWithCount[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [showForm, setShowForm] = useState(false);
-  const [editingCategory, setEditingCategory] = useState<Category | null>(null);
+  const [editingCategory, setEditingCategory] = useState<CategoryWithCount | null>(null);
   const [formData, setFormData] = useState({ name: '', icon: '🏷️', color: '#FFCA28' });
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (editingCategory) {
-      setCategories((prev) =>
-        prev.map((c) => (c.id === editingCategory.id ? { ...c, name: formData.name, icon: formData.icon, color: formData.color } : c))
-      );
-    } else {
-      setCategories((prev) => [
-        ...prev,
-        { id: String(Date.now()), name: formData.name, icon: formData.icon, color: formData.color, productCount: 0 },
-      ]);
+  const loadCategories = async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const data = await listCategories();
+      setCategories(data);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Error al cargar las categorías');
+    } finally {
+      setLoading(false);
     }
-    setShowForm(false);
-    setEditingCategory(null);
-    setFormData({ name: '', icon: '🏷️', color: '#FFCA28' });
   };
 
-  const handleDelete = (id: string) => {
-    if (confirm('¿Eliminar esta categoría?')) {
-      setCategories((prev) => prev.filter((c) => c.id !== id));
+  useEffect(() => {
+    loadCategories();
+  }, []);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    try {
+      if (editingCategory) {
+        await updateCategory(editingCategory.id, {
+          name: formData.name,
+          icon: formData.icon,
+          color: formData.color,
+        });
+      } else {
+        await createCategory(
+          { name: formData.name, icon: formData.icon, color: formData.color },
+          user!.business_id
+        );
+      }
+      setShowForm(false);
+      setEditingCategory(null);
+      setFormData({ name: '', icon: '🏷️', color: '#FFCA28' });
+      await loadCategories();
+    } catch (err) {
+      alert(err instanceof Error ? err.message : 'Error al guardar la categoría');
+    }
+  };
+
+  const handleDelete = async (id: string) => {
+    if (!confirm('¿Eliminar esta categoría?')) return;
+    try {
+      await deleteCategory(id);
+      await loadCategories();
+    } catch (err) {
+      alert(err instanceof Error ? err.message : 'Error al eliminar la categoría');
     }
   };
 
@@ -70,31 +89,41 @@ export function CategoriesPage() {
         </Button>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-        {categories.map((cat) => (
-          <Card key={cat.id} className="hover:border-kiosko-600/30 transition-colors">
-            <div className="flex items-start justify-between">
-              <div className="flex items-center gap-3">
-                <div className="w-12 h-12 rounded-xl flex items-center justify-center text-2xl" style={{ backgroundColor: cat.color + '20' }}>
-                  {cat.icon}
+      {error && (
+        <div className="rounded-lg border border-red-800 bg-red-900/40 px-4 py-3 text-sm text-red-400">
+          {error}
+        </div>
+      )}
+
+      {loading ? (
+        <div className="py-10 text-center text-sm text-surface-400">Cargando...</div>
+      ) : (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+          {categories.map((cat) => (
+            <Card key={cat.id} className="hover:border-kiosko-600/30 transition-colors">
+              <div className="flex items-start justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="w-12 h-12 rounded-xl flex items-center justify-center text-2xl" style={{ backgroundColor: (cat.color ?? '#FFCA28') + '20' }}>
+                    {cat.icon}
+                  </div>
+                  <div>
+                    <h3 className="font-semibold text-white">{cat.name}</h3>
+                    <p className="text-xs text-surface-400">{cat.productCount} productos</p>
+                  </div>
                 </div>
-                <div>
-                  <h3 className="font-semibold text-white">{cat.name}</h3>
-                  <p className="text-xs text-surface-400">{cat.productCount} productos</p>
+                <div className="flex items-center gap-1">
+                  <button onClick={() => { setEditingCategory(cat); setFormData({ name: cat.name, icon: cat.icon ?? '', color: cat.color ?? '#FFCA28' }); setShowForm(true); }} className="p-1.5 rounded-lg hover:bg-surface-700 text-surface-400 hover:text-white">
+                    <Edit size={14} />
+                  </button>
+                  <button onClick={() => handleDelete(cat.id)} className="p-1.5 rounded-lg hover:bg-red-900/30 text-surface-400 hover:text-red-400">
+                    <Trash2 size={14} />
+                  </button>
                 </div>
               </div>
-              <div className="flex items-center gap-1">
-                <button onClick={() => { setEditingCategory(cat); setFormData({ name: cat.name, icon: cat.icon, color: cat.color }); setShowForm(true); }} className="p-1.5 rounded-lg hover:bg-surface-700 text-surface-400 hover:text-white">
-                  <Edit size={14} />
-                </button>
-                <button onClick={() => handleDelete(cat.id)} className="p-1.5 rounded-lg hover:bg-red-900/30 text-surface-400 hover:text-red-400">
-                  <Trash2 size={14} />
-                </button>
-              </div>
-            </div>
-          </Card>
-        ))}
-      </div>
+            </Card>
+          ))}
+        </div>
+      )}
 
       {showForm && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">

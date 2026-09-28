@@ -1,53 +1,99 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Users, Plus, Search, Edit, Trash2, X, Phone, Mail, MapPin } from 'lucide-react';
 import { Card } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
 import { Badge } from '../../components/ui/Badge';
 import { Input } from '../../components/ui/Input';
 import { formatCurrency } from '../../utils/format';
+import { useAuth } from '../../contexts/AuthContext';
+import { listCustomers, createCustomer, updateCustomer, deleteCustomer } from '../../services/customers.service';
+import type { Customer } from '../../types';
 
-interface Customer {
-  id: string;
-  name: string;
-  phone: string;
-  email: string;
-  dni: string;
-  cuit: string;
-  address: string;
-  balance: number;
-}
-
-const mockCustomers: Customer[] = [
-  { id: '1', name: 'María López', phone: '11-5555-1234', email: 'maria@email.com', dni: '30123456', cuit: '', address: 'Av. Corrientes 1234', balance: -8200 },
-  { id: '2', name: 'Juan Pérez', phone: '11-5555-5678', email: 'juan@email.com', dni: '28456789', cuit: '20-28456789-0', address: 'San Martín 456', balance: -15800 },
-  { id: '3', name: 'Ana García', phone: '11-5555-9012', email: 'ana@email.com', dni: '32789012', cuit: '', address: 'Belgrano 789', balance: 0 },
-  { id: '4', name: 'Carlos Rodríguez', phone: '11-5555-3456', email: 'carlos@email.com', dni: '27345678', cuit: '20-27345678-0', address: 'Rivadavia 1010', balance: -3500 },
-  { id: '5', name: 'Lucía Martínez', phone: '11-5555-7890', email: 'lucia@email.com', dni: '31901234', cuit: '', address: 'Mitre 2020', balance: 0 },
-];
+const emptyForm = { name: '', phone: '', email: '', dni: '', cuit: '', address: '', notes: '' };
 
 export function CustomersPage() {
-  const [customers, setCustomers] = useState<Customer[]>(mockCustomers);
+  const { user } = useAuth();
+  const [customers, setCustomers] = useState<Customer[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState('');
   const [showForm, setShowForm] = useState(false);
   const [editing, setEditing] = useState<Customer | null>(null);
-  const [form, setForm] = useState({ name: '', phone: '', email: '', dni: '', cuit: '', address: '' });
+  const [form, setForm] = useState(emptyForm);
 
-  const filtered = customers.filter((c) => c.name.toLowerCase().includes(search.toLowerCase()) || c.dni.includes(search) || c.phone.includes(search));
+  useEffect(() => {
+    let active = true;
+    listCustomers()
+      .then((data) => {
+        if (active) setCustomers(data);
+      })
+      .catch((err) => {
+        if (active) setError(err instanceof Error ? err.message : 'Error al cargar los clientes');
+      })
+      .finally(() => {
+        if (active) setLoading(false);
+      });
+    return () => {
+      active = false;
+    };
+  }, []);
 
-  const resetForm = () => { setForm({ name: '', phone: '', email: '', dni: '', cuit: '', address: '' }); setEditing(null); };
+  const filtered = customers.filter(
+    (c) =>
+      c.name.toLowerCase().includes(search.toLowerCase()) ||
+      (c.dni ?? '').includes(search) ||
+      (c.phone ?? '').includes(search)
+  );
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (editing) {
-      setCustomers((prev) => prev.map((c) => c.id === editing.id ? { ...c, ...form } : c));
-    } else {
-      setCustomers((prev) => [...prev, { id: String(Date.now()), ...form, balance: 0 }]);
-    }
-    setShowForm(false);
-    resetForm();
+  const resetForm = () => {
+    setForm(emptyForm);
+    setEditing(null);
   };
 
-  const handleEdit = (c: Customer) => { setEditing(c); setForm({ name: c.name, phone: c.phone, email: c.email, dni: c.dni, cuit: c.cuit, address: c.address }); setShowForm(true); };
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!user) {
+      alert('No hay una sesión activa');
+      return;
+    }
+    try {
+      if (editing) {
+        await updateCustomer(editing.id, form);
+        setCustomers((prev) => prev.map((c) => (c.id === editing.id ? { ...c, ...form } : c)));
+      } else {
+        const created = await createCustomer(form, user.business_id);
+        setCustomers((prev) => [...prev, created]);
+      }
+      setShowForm(false);
+      resetForm();
+    } catch (err) {
+      alert(err instanceof Error ? err.message : 'Error al guardar el cliente');
+    }
+  };
+
+  const handleDelete = async (customer: Customer) => {
+    if (!confirm('¿Estás seguro de eliminar este cliente?')) return;
+    try {
+      await deleteCustomer(customer.id);
+      setCustomers((prev) => prev.filter((c) => c.id !== customer.id));
+    } catch (err) {
+      alert(err instanceof Error ? err.message : 'Error al eliminar el cliente');
+    }
+  };
+
+  const handleEdit = (c: Customer) => {
+    setEditing(c);
+    setForm({
+      name: c.name,
+      phone: c.phone ?? '',
+      email: c.email ?? '',
+      dni: c.dni ?? '',
+      cuit: c.cuit ?? '',
+      address: c.address ?? '',
+      notes: c.notes ?? '',
+    });
+    setShowForm(true);
+  };
 
   return (
     <div className="max-w-6xl mx-auto space-y-6">
@@ -74,7 +120,12 @@ export function CustomersPage() {
       </Card>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-        {filtered.map((customer) => (
+        {loading && <p className="col-span-full text-center text-sm text-surface-400 py-8">Cargando...</p>}
+        {!loading && error && <p className="col-span-full text-center text-sm text-red-400 py-8">{error}</p>}
+        {!loading && !error && filtered.length === 0 && (
+          <p className="col-span-full text-center text-sm text-surface-400 py-8">No hay clientes registrados</p>
+        )}
+        {!loading && !error && filtered.map((customer) => (
           <Card key={customer.id} className="hover:border-kiosko-600/30 transition-colors">
             <div className="flex items-start justify-between mb-3">
               <div className="flex items-center gap-3">
@@ -88,7 +139,7 @@ export function CustomersPage() {
               </div>
               <div className="flex gap-1">
                 <button onClick={() => handleEdit(customer)} className="p-1.5 rounded-lg hover:bg-surface-700 text-surface-400 hover:text-white"><Edit size={14} /></button>
-                <button onClick={() => setCustomers((prev) => prev.filter((c) => c.id !== customer.id))} className="p-1.5 rounded-lg hover:bg-red-900/30 text-surface-400 hover:text-red-400"><Trash2 size={14} /></button>
+                <button onClick={() => handleDelete(customer)} className="p-1.5 rounded-lg hover:bg-red-900/30 text-surface-400 hover:text-red-400"><Trash2 size={14} /></button>
               </div>
             </div>
             <div className="space-y-1.5 text-xs text-surface-400">
@@ -124,6 +175,7 @@ export function CustomersPage() {
                 <Input label="CUIT" value={form.cuit} onChange={(e) => setForm({ ...form, cuit: e.target.value })} />
               </div>
               <Input label="Dirección" value={form.address} onChange={(e) => setForm({ ...form, address: e.target.value })} />
+              <Input label="Observaciones" value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} />
               <div className="flex gap-3 pt-2">
                 <Button type="button" variant="secondary" fullWidth onClick={() => { setShowForm(false); resetForm(); }}>Cancelar</Button>
                 <Button type="submit" fullWidth>{editing ? 'Guardar' : 'Crear'}</Button>

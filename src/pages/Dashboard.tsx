@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import {
   ShoppingCart,
@@ -12,12 +13,13 @@ import {
   Ticket,
   Settings,
   TrendingUp,
-  TrendingDown,
   AlertTriangle,
   ArrowUpRight,
 } from 'lucide-react';
 import { Card } from '../components/ui/Card';
 import { Badge } from '../components/ui/Badge';
+import { getDashboardData, type DashboardData } from '../services/dashboard.service';
+import { formatCurrency, formatTime } from '../utils/format';
 
 const quickActions = [
   { label: 'Cargar Ventas', path: '/sales/new', icon: <ShoppingCart size={24} />, color: 'bg-kiosko-600 text-black' },
@@ -33,37 +35,68 @@ const quickActions = [
   { label: 'Configuración', path: '/settings', icon: <Settings size={24} />, color: 'bg-surface-800 text-kiosko-500' },
 ];
 
-const topProducts = [
-  { name: 'Coca Cola 500ml', sold: 48, revenue: '$120.000' },
-  { name: 'Pan Francés', sold: 35, revenue: '$52.500' },
-  { name: 'Leche La Serenísima', sold: 32, revenue: '$48.000' },
-  { name: 'Alfajor Havanna', sold: 28, revenue: '$33.600' },
-  { name: 'Yerba Mate 1kg', sold: 22, revenue: '$44.000' },
-];
-
-const recentSales = [
-  { id: '#1024', client: 'Consumidor Final', total: '$4.500', method: 'Efectivo', time: '14:32' },
-  { id: '#1023', client: 'María López', total: '$8.200', method: 'Tarjeta', time: '14:15' },
-  { id: '#1022', client: 'Consumidor Final', total: '$2.100', method: 'Mercado Pago', time: '13:58' },
-  { id: '#1021', client: 'Juan Pérez', total: '$15.800', method: 'Transferencia', time: '13:40' },
-  { id: '#1020', client: 'Consumidor Final', total: '$3.300', method: 'Efectivo', time: '13:22' },
-];
+const paymentMethodLabels: Record<string, string> = {
+  cash: 'Efectivo',
+  debit: 'Tarjeta Débito',
+  credit: 'Tarjeta Crédito',
+  transfer: 'Transferencia',
+  mercadopago: 'Mercado Pago',
+  account: 'Cuenta Corriente',
+  other: 'Otro',
+};
 
 export function Dashboard() {
+  const [data, setData] = useState<DashboardData | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let active = true;
+    getDashboardData()
+      .then((result) => {
+        if (active) setData(result);
+      })
+      .catch((err: unknown) => {
+        if (active) setError(err instanceof Error ? err.message : 'No se pudo cargar el dashboard');
+      })
+      .finally(() => {
+        if (active) setLoading(false);
+      });
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  if (loading) {
+    return (
+      <div className="max-w-7xl mx-auto">
+        <Card>
+          <p className="text-sm text-surface-400 text-center py-10">Cargando...</p>
+        </Card>
+      </div>
+    );
+  }
+
+  if (error || !data) {
+    return (
+      <div className="max-w-7xl mx-auto">
+        <Card>
+          <p className="text-sm text-red-400 text-center py-10">
+            {error ?? 'No se pudo cargar el dashboard'}
+          </p>
+        </Card>
+      </div>
+    );
+  }
+
   return (
     <div className="max-w-7xl mx-auto space-y-6">
-      {/* Stats Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <Card>
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm text-surface-400">Ventas de hoy</p>
-              <p className="text-2xl font-bold text-white mt-1">$156.800</p>
-              <div className="flex items-center gap-1 mt-1">
-                <TrendingUp size={14} className="text-green-400" />
-                <span className="text-xs text-green-400">+12%</span>
-                <span className="text-xs text-surface-500">vs ayer</span>
-              </div>
+              <p className="text-2xl font-bold text-white mt-1">{formatCurrency(data.todayTotal)}</p>
             </div>
             <div className="w-12 h-12 rounded-xl bg-kiosko-600/15 flex items-center justify-center">
               <TrendingUp size={22} className="text-kiosko-500" />
@@ -74,13 +107,8 @@ export function Dashboard() {
         <Card>
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm text-surface-400">Ingresos</p>
-              <p className="text-2xl font-bold text-white mt-1">$198.500</p>
-              <div className="flex items-center gap-1 mt-1">
-                <TrendingUp size={14} className="text-green-400" />
-                <span className="text-xs text-green-400">+8%</span>
-                <span className="text-xs text-surface-500">esta semana</span>
-              </div>
+              <p className="text-sm text-surface-400">Ventas del mes</p>
+              <p className="text-2xl font-bold text-white mt-1">{formatCurrency(data.monthTotal)}</p>
             </div>
             <div className="w-12 h-12 rounded-xl bg-green-900/30 flex items-center justify-center">
               <ArrowUpRight size={22} className="text-green-400" />
@@ -91,14 +119,11 @@ export function Dashboard() {
         <Card>
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm text-surface-400">Ganancia estimada</p>
-              <p className="text-2xl font-bold text-white mt-1">$47.040</p>
-              <div className="flex items-center gap-1 mt-1">
-                <span className="text-xs text-surface-500">30% margen</span>
-              </div>
+              <p className="text-sm text-surface-400">Productos</p>
+              <p className="text-2xl font-bold text-white mt-1">{data.productCount}</p>
             </div>
-            <div className="w-12 h-12 rounded-xl bg-kiosko-600/15 flex items-center justify-center">
-              <TrendingUp size={22} className="text-kiosko-500" />
+            <div className="w-12 h-12 rounded-xl bg-surface-800 flex items-center justify-center">
+              <Package size={22} className="text-kiosko-500" />
             </div>
           </div>
         </Card>
@@ -107,11 +132,13 @@ export function Dashboard() {
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm text-surface-400">Stock bajo</p>
-              <p className="text-2xl font-bold text-white mt-1">7</p>
-              <div className="flex items-center gap-1 mt-1">
-                <AlertTriangle size={14} className="text-yellow-400" />
-                <span className="text-xs text-yellow-400">Requiere atención</span>
-              </div>
+              <p className="text-2xl font-bold text-white mt-1">{data.lowStockCount}</p>
+              {data.lowStockCount > 0 && (
+                <div className="flex items-center gap-1 mt-1">
+                  <AlertTriangle size={14} className="text-yellow-400" />
+                  <span className="text-xs text-yellow-400">Requiere atención</span>
+                </div>
+              )}
             </div>
             <div className="w-12 h-12 rounded-xl bg-yellow-900/30 flex items-center justify-center">
               <AlertTriangle size={22} className="text-yellow-400" />
@@ -120,7 +147,6 @@ export function Dashboard() {
         </Card>
       </div>
 
-      {/* Quick Actions */}
       <Card>
         <h2 className="text-lg font-semibold text-white mb-4">Accesos rápidos</h2>
         <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-6 gap-3">
@@ -139,9 +165,7 @@ export function Dashboard() {
         </div>
       </Card>
 
-      {/* Bottom Row */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        {/* Recent Sales */}
         <Card>
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-lg font-semibold text-white">Últimas ventas</h2>
@@ -150,24 +174,31 @@ export function Dashboard() {
             </Link>
           </div>
           <div className="space-y-3">
-            {recentSales.map((sale) => (
-              <div key={sale.id} className="flex items-center justify-between py-2 border-b border-surface-800/50 last:border-0">
-                <div className="flex items-center gap-3">
-                  <div className="w-8 h-8 rounded-lg bg-surface-800 flex items-center justify-center">
-                    <Receipt size={14} className="text-surface-400" />
+            {data.recentSales.length === 0 ? (
+              <p className="text-sm text-surface-500 text-center py-4">Todavía no hay ventas</p>
+            ) : (
+              data.recentSales.map((sale) => (
+                <div key={sale.id} className="flex items-center justify-between py-2 border-b border-surface-800/50 last:border-0">
+                  <div className="flex items-center gap-3">
+                    <div className="w-8 h-8 rounded-lg bg-surface-800 flex items-center justify-center">
+                      <Receipt size={14} className="text-surface-400" />
+                    </div>
+                    <div>
+                      <p className="text-sm font-medium text-white">
+                        #{sale.number} - {sale.customers?.name ?? 'Consumidor Final'}
+                      </p>
+                      <p className="text-xs text-surface-500">
+                        {formatTime(sale.created_at)} · {paymentMethodLabels[sale.payment_method] ?? sale.payment_method}
+                      </p>
+                    </div>
                   </div>
-                  <div>
-                    <p className="text-sm font-medium text-white">{sale.id} - {sale.client}</p>
-                    <p className="text-xs text-surface-500">{sale.time} · {sale.method}</p>
-                  </div>
+                  <span className="text-sm font-semibold text-kiosko-500">{formatCurrency(sale.total)}</span>
                 </div>
-                <span className="text-sm font-semibold text-kiosko-500">{sale.total}</span>
-              </div>
-            ))}
+              ))
+            )}
           </div>
         </Card>
 
-        {/* Top Products */}
         <Card>
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-lg font-semibold text-white">Productos más vendidos</h2>
@@ -176,56 +207,55 @@ export function Dashboard() {
             </Link>
           </div>
           <div className="space-y-3">
-            {topProducts.map((product, index) => (
-              <div key={product.name} className="flex items-center justify-between py-2 border-b border-surface-800/50 last:border-0">
-                <div className="flex items-center gap-3">
-                  <span className="text-sm font-bold text-surface-500 w-6">#{index + 1}</span>
-                  <div>
-                    <p className="text-sm font-medium text-white">{product.name}</p>
-                    <p className="text-xs text-surface-500">{product.sold} vendidos</p>
+            {data.topProducts.length === 0 ? (
+              <p className="text-sm text-surface-500 text-center py-4">Sin ventas en el mes</p>
+            ) : (
+              data.topProducts.map((product, index) => (
+                <div key={product.name} className="flex items-center justify-between py-2 border-b border-surface-800/50 last:border-0">
+                  <div className="flex items-center gap-3">
+                    <span className="text-sm font-bold text-surface-500 w-6">#{index + 1}</span>
+                    <div>
+                      <p className="text-sm font-medium text-white">{product.name}</p>
+                      <p className="text-xs text-surface-500">{product.sold} vendidos</p>
+                    </div>
                   </div>
+                  <span className="text-sm font-semibold text-kiosko-500">{formatCurrency(product.revenue)}</span>
                 </div>
-                <span className="text-sm font-semibold text-kiosko-500">{product.revenue}</span>
-              </div>
-            ))}
+              ))
+            )}
           </div>
         </Card>
       </div>
 
-      {/* Stock Alerts */}
       <Card>
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-lg font-semibold text-white">Alertas de stock</h2>
-          <Badge variant="warning">7 productos</Badge>
+          <Badge variant="warning">{data.lowStockCount} productos</Badge>
         </div>
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-          {[
-            { name: 'Coca Cola 500ml', stock: 3, min: 10 },
-            { name: 'Pan Francés', stock: 2, min: 5 },
-            { name: 'Leche La Serenísima', stock: 4, min: 8 },
-            { name: 'Alfajor Havanna', stock: 1, min: 5 },
-            { name: 'Galletitas Oreo', stock: 3, min: 6 },
-            { name: 'Papel Higiénico', stock: 2, min: 10 },
-            { name: 'Jabón en Barra', stock: 0, min: 5 },
-          ].map((item) => (
-            <div
-              key={item.name}
-              className={`flex items-center justify-between p-3 rounded-lg border ${
-                item.stock === 0
-                  ? 'bg-red-900/20 border-red-800'
-                  : 'bg-yellow-900/20 border-yellow-800'
-              }`}
-            >
-              <div>
-                <p className="text-sm font-medium text-white">{item.name}</p>
-                <p className="text-xs text-surface-400">Mín: {item.min}</p>
+        {data.lowStockProducts.length === 0 ? (
+          <p className="text-sm text-surface-500 text-center py-4">Todo el stock está bien</p>
+        ) : (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+            {data.lowStockProducts.map((item) => (
+              <div
+                key={item.id}
+                className={`flex items-center justify-between p-3 rounded-lg border ${
+                  item.stock <= 0
+                    ? 'bg-red-900/20 border-red-800'
+                    : 'bg-yellow-900/20 border-yellow-800'
+                }`}
+              >
+                <div>
+                  <p className="text-sm font-medium text-white">{item.name}</p>
+                  <p className="text-xs text-surface-400">Stock: {item.stock} · Mín: {item.min_stock}</p>
+                </div>
+                <Badge variant={item.stock <= 0 ? 'danger' : 'warning'}>
+                  {item.stock <= 0 ? 'Agotado' : `${item.stock} uds`}
+                </Badge>
               </div>
-              <Badge variant={item.stock === 0 ? 'danger' : 'warning'}>
-                {item.stock === 0 ? 'Agotado' : `${item.stock} uds`}
-              </Badge>
-            </div>
-          ))}
-        </div>
+            ))}
+          </div>
+        )}
       </Card>
     </div>
   );

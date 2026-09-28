@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
   Package,
   Plus,
@@ -9,54 +9,44 @@ import {
   Copy,
   X,
   Filter,
-  ChevronDown,
 } from 'lucide-react';
 import { Card } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
 import { Badge } from '../../components/ui/Badge';
 import { Input } from '../../components/ui/Input';
 import { formatCurrency } from '../../utils/format';
+import { useAuth } from '../../contexts/AuthContext';
+import {
+  listProducts,
+  createProduct,
+  updateProduct,
+  deleteProduct,
+  type ProductInput,
+  type ProductWithCategory,
+} from '../../services/products.service';
+import { listCategories, type CategoryWithCount } from '../../services/categories.service';
+import type { UnitType } from '../../types';
 
-interface Product {
-  id: string;
-  name: string;
-  description?: string;
-  sku: string;
-  barcode: string;
-  category: string;
-  cost: number;
-  price: number;
-  stock: number;
-  minStock: number;
-  unit: string;
-  tax: number;
-  active: boolean;
+type UnitFormValue = 'uds' | 'kg' | 'g' | 'l' | 'ml' | 'm';
+
+function toFormUnit(unit: UnitType): UnitFormValue {
+  return unit === 'unit' ? 'uds' : unit;
 }
 
-const mockProducts: Product[] = [
-  { id: '1', name: 'Coca Cola 500ml', sku: 'BEB-001', barcode: '77900001', category: 'Bebidas', cost: 1500, price: 2500, stock: 24, minStock: 10, unit: 'uds', tax: 21, active: true },
-  { id: '2', name: 'Pepsi 500ml', sku: 'BEB-002', barcode: '77900002', category: 'Bebidas', cost: 1400, price: 2300, stock: 18, minStock: 10, unit: 'uds', tax: 21, active: true },
-  { id: '3', name: 'Agua Mineral 500ml', sku: 'BEB-003', barcode: '77900003', category: 'Bebidas', cost: 600, price: 1200, stock: 30, minStock: 15, unit: 'uds', tax: 21, active: true },
-  { id: '4', name: 'Alfajor Havanna', sku: 'GOL-001', barcode: '77900004', category: 'Golosinas', cost: 700, price: 1200, stock: 15, minStock: 8, unit: 'uds', tax: 21, active: true },
-  { id: '5', name: 'Galletitas Oreo', sku: 'GOL-002', barcode: '77900005', category: 'Golosinas', cost: 1000, price: 1800, stock: 12, minStock: 6, unit: 'uds', tax: 21, active: true },
-  { id: '6', name: 'Chocolate Milka', sku: 'GOL-003', barcode: '77900006', category: 'Golosinas', cost: 1300, price: 2200, stock: 8, minStock: 5, unit: 'uds', tax: 21, active: true },
-  { id: '7', name: 'Yerba Mate 1kg', sku: 'ALM-001', barcode: '77900007', category: 'Almacén', cost: 1200, price: 2000, stock: 20, minStock: 10, unit: 'uds', tax: 21, active: true },
-  { id: '8', name: 'Azúcar 1kg', sku: 'ALM-002', barcode: '77900008', category: 'Almacén', cost: 900, price: 1500, stock: 25, minStock: 10, unit: 'uds', tax: 21, active: true },
-  { id: '9', name: 'Harina 1kg', sku: 'ALM-003', barcode: '77900009', category: 'Almacén', cost: 600, price: 1100, stock: 22, minStock: 10, unit: 'uds', tax: 21, active: true },
-  { id: '10', name: 'Leche La Serenísima', sku: 'LAC-001', barcode: '77900010', category: 'Lácteos', cost: 900, price: 1500, stock: 16, minStock: 8, unit: 'uds', tax: 21, active: true },
-  { id: '11', name: 'Queso Cremoso', sku: 'LAC-002', barcode: '77900011', category: 'Lácteos', cost: 6000, price: 9500, stock: 5, minStock: 3, unit: 'kg', tax: 10.5, active: true },
-  { id: '12', name: 'Pan Francés', sku: 'PAN-001', barcode: '77900012', category: 'Panadería', cost: 800, price: 1500, stock: 30, minStock: 15, unit: 'uds', tax: 10.5, active: true },
-  { id: '13', name: 'Medialunas x6', sku: 'PAN-002', barcode: '77900013', category: 'Panadería', cost: 2000, price: 3500, stock: 10, minStock: 5, unit: 'uds', tax: 10.5, active: true },
-  { id: '14', name: 'Carne', sku: 'CAR-001', barcode: '77900014', category: 'Carnicería', cost: 5500, price: 9500, stock: 8, minStock: 5, unit: 'kg', tax: 10.5, active: true },
-  { id: '15', name: 'Pollo Entero', sku: 'CAR-002', barcode: '77900015', category: 'Carnicería', cost: 3200, price: 5800, stock: 10, minStock: 5, unit: 'kg', tax: 10.5, active: true },
-];
+function toUnitType(unit: UnitFormValue): UnitType {
+  return unit === 'uds' ? 'unit' : unit;
+}
 
 export function ProductsPage() {
-  const [products, setProducts] = useState<Product[]>(mockProducts);
+  const { user } = useAuth();
+  const [products, setProducts] = useState<ProductWithCategory[]>([]);
+  const [categories, setCategories] = useState<CategoryWithCount[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState('');
   const [filterCategory, setFilterCategory] = useState('all');
   const [showForm, setShowForm] = useState(false);
-  const [editingProduct, setEditingProduct] = useState<Product | null>(null);
+  const [editingProduct, setEditingProduct] = useState<ProductWithCategory | null>(null);
   const [formData, setFormData] = useState({
     name: '',
     description: '',
@@ -67,15 +57,35 @@ export function ProductsPage() {
     price: '',
     stock: '',
     minStock: '',
-    unit: 'uds',
+    unit: 'uds' as UnitFormValue,
     tax: '21',
   });
 
-  const categories = ['Bebidas', 'Golosinas', 'Almacén', 'Lácteos', 'Panadería', 'Carnicería', 'Limpieza', 'Dietética', 'Frescos'];
+  const loadProducts = async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const [prods, cats] = await Promise.all([listProducts(), listCategories()]);
+      setProducts(prods);
+      setCategories(cats);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Error al cargar los datos');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadProducts();
+  }, []);
 
   const filtered = products.filter((p) => {
-    const matchSearch = p.name.toLowerCase().includes(search.toLowerCase()) || p.sku.toLowerCase().includes(search.toLowerCase()) || p.barcode.includes(search);
-    const matchCat = filterCategory === 'all' || p.category === filterCategory;
+    const term = search.toLowerCase();
+    const matchSearch =
+      p.name.toLowerCase().includes(term) ||
+      (p.sku ?? '').toLowerCase().includes(term) ||
+      (p.barcode ?? '').includes(search);
+    const matchCat = filterCategory === 'all' || p.category_id === filterCategory;
     return matchSearch && matchCat;
   });
 
@@ -84,88 +94,95 @@ export function ProductsPage() {
     setEditingProduct(null);
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const buildInput = (): ProductInput => ({
+    name: formData.name,
+    description: formData.description,
+    sku: formData.sku,
+    barcode: formData.barcode,
+    category_id: formData.category || null,
+    cost: parseFloat(formData.cost) || 0,
+    price: parseFloat(formData.price) || 0,
+    stock: parseFloat(formData.stock) || 0,
+    min_stock: parseFloat(formData.minStock) || 0,
+    unit: toUnitType(formData.unit),
+    tax: parseFloat(formData.tax) || 21,
+  });
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (editingProduct) {
-      setProducts((prev) =>
-        prev.map((p) =>
-          p.id === editingProduct.id
-            ? {
-                ...p,
-                name: formData.name,
-                description: formData.description,
-                sku: formData.sku,
-                barcode: formData.barcode,
-                category: formData.category,
-                cost: parseFloat(formData.cost) || 0,
-                price: parseFloat(formData.price) || 0,
-                stock: parseFloat(formData.stock) || 0,
-                minStock: parseFloat(formData.minStock) || 0,
-                unit: formData.unit,
-                tax: parseFloat(formData.tax) || 21,
-              }
-            : p
-        )
-      );
-    } else {
-      const newProduct: Product = {
-        id: String(Date.now()),
-        name: formData.name,
-        description: formData.description,
-        sku: formData.sku,
-        barcode: formData.barcode,
-        category: formData.category,
-        cost: parseFloat(formData.cost) || 0,
-        price: parseFloat(formData.price) || 0,
-        stock: parseFloat(formData.stock) || 0,
-        minStock: parseFloat(formData.minStock) || 0,
-        unit: formData.unit,
-        tax: parseFloat(formData.tax) || 21,
-        active: true,
-      };
-      setProducts((prev) => [...prev, newProduct]);
+    try {
+      if (editingProduct) {
+        await updateProduct(editingProduct.id, buildInput());
+      } else {
+        await createProduct(buildInput(), user!.business_id);
+      }
+      setShowForm(false);
+      resetForm();
+      await loadProducts();
+    } catch (err) {
+      alert(err instanceof Error ? err.message : 'Error al guardar el producto');
     }
-    setShowForm(false);
-    resetForm();
   };
 
-  const handleEdit = (product: Product) => {
+  const handleEdit = (product: ProductWithCategory) => {
     setEditingProduct(product);
     setFormData({
       name: product.name,
       description: product.description || '',
-      sku: product.sku,
-      barcode: product.barcode,
-      category: product.category,
+      sku: product.sku || '',
+      barcode: product.barcode || '',
+      category: product.category_id || '',
       cost: String(product.cost),
       price: String(product.price),
       stock: String(product.stock),
-      minStock: String(product.minStock),
-      unit: product.unit,
+      minStock: String(product.min_stock),
+      unit: toFormUnit(product.unit),
       tax: String(product.tax),
     });
     setShowForm(true);
   };
 
-  const handleDuplicate = (product: Product) => {
-    const newProduct: Product = {
-      ...product,
-      id: String(Date.now()),
-      name: product.name + ' (Copia)',
-      sku: product.sku + '-COPY',
-      barcode: '',
-    };
-    setProducts((prev) => [...prev, newProduct]);
-  };
-
-  const handleDelete = (id: string) => {
-    if (confirm('¿Eliminar este producto?')) {
-      setProducts((prev) => prev.filter((p) => p.id !== id));
+  const handleDuplicate = async (product: ProductWithCategory) => {
+    try {
+      await createProduct(
+        {
+          name: product.name + ' (Copia)',
+          description: product.description,
+          sku: product.sku ? product.sku + '-COPY' : '',
+          barcode: '',
+          category_id: product.category_id ?? null,
+          cost: product.cost,
+          price: product.price,
+          stock: product.stock,
+          min_stock: product.min_stock,
+          unit: product.unit,
+          tax: product.tax,
+        },
+        user!.business_id
+      );
+      await loadProducts();
+    } catch (err) {
+      alert(err instanceof Error ? err.message : 'Error al duplicar el producto');
     }
   };
 
-  const handleToggleActive = (id: string) => {
-    setProducts((prev) => prev.map((p) => (p.id === id ? { ...p, active: !p.active } : p)));
+  const handleDelete = async (id: string) => {
+    if (!confirm('¿Eliminar este producto?')) return;
+    try {
+      await deleteProduct(id);
+      await loadProducts();
+    } catch (err) {
+      alert(err instanceof Error ? err.message : 'Error al eliminar el producto');
+    }
+  };
+
+  const handleToggleActive = async (product: ProductWithCategory) => {
+    try {
+      await updateProduct(product.id, { active: !product.active });
+      await loadProducts();
+    } catch (err) {
+      alert(err instanceof Error ? err.message : 'Error al cambiar el estado del producto');
+    }
   };
 
   return (
@@ -186,6 +203,12 @@ export function ProductsPage() {
           Nuevo producto
         </Button>
       </div>
+
+      {error && (
+        <div className="rounded-lg border border-red-800 bg-red-900/40 px-4 py-3 text-sm text-red-400">
+          {error}
+        </div>
+      )}
 
       {/* Filters */}
       <Card>
@@ -209,7 +232,7 @@ export function ProductsPage() {
             >
               <option value="all">Todas las categorías</option>
               {categories.map((cat) => (
-                <option key={cat} value={cat}>{cat}</option>
+                <option key={cat.id} value={cat.id}>{cat.name}</option>
               ))}
             </select>
           </div>
@@ -233,7 +256,17 @@ export function ProductsPage() {
               </tr>
             </thead>
             <tbody>
-              {filtered.map((product) => (
+              {loading && (
+                <tr>
+                  <td colSpan={8} className="px-4 py-10 text-center text-surface-400">Cargando...</td>
+                </tr>
+              )}
+              {!loading && filtered.length === 0 && (
+                <tr>
+                  <td colSpan={8} className="px-4 py-10 text-center text-surface-400">No hay productos cargados</td>
+                </tr>
+              )}
+              {!loading && filtered.map((product) => (
                 <tr key={product.id} className="border-b border-surface-800/50 hover:bg-surface-800/30 transition-colors">
                   <td className="px-4 py-3">
                     <div className="flex items-center gap-3">
@@ -248,13 +281,13 @@ export function ProductsPage() {
                   </td>
                   <td className="px-4 py-3 text-surface-300 hidden md:table-cell">{product.sku}</td>
                   <td className="px-4 py-3 hidden lg:table-cell">
-                    <Badge>{product.category}</Badge>
+                    <Badge>{product.categories?.name ?? '—'}</Badge>
                   </td>
                   <td className="px-4 py-3 text-right text-surface-300">{formatCurrency(product.cost)}</td>
                   <td className="px-4 py-3 text-right font-semibold text-kiosko-500">{formatCurrency(product.price)}</td>
                   <td className="px-4 py-3 text-center">
-                    <span className={`font-medium ${product.stock <= product.minStock ? 'text-red-400' : 'text-green-400'}`}>
-                      {product.stock} {product.unit}
+                    <span className={`font-medium ${product.stock <= product.min_stock ? 'text-red-400' : 'text-green-400'}`}>
+                      {product.stock} {toFormUnit(product.unit)}
                     </span>
                   </td>
                   <td className="px-4 py-3 text-center">
@@ -270,7 +303,7 @@ export function ProductsPage() {
                       <button onClick={() => handleDuplicate(product)} className="p-1.5 rounded-lg hover:bg-surface-700 text-surface-400 hover:text-white" title="Duplicar">
                         <Copy size={14} />
                       </button>
-                      <button onClick={() => handleToggleActive(product.id)} className="p-1.5 rounded-lg hover:bg-surface-700 text-surface-400 hover:text-white" title={product.active ? 'Desactivar' : 'Activar'}>
+                      <button onClick={() => handleToggleActive(product)} className="p-1.5 rounded-lg hover:bg-surface-700 text-surface-400 hover:text-white" title={product.active ? 'Desactivar' : 'Activar'}>
                         <Eye size={14} />
                       </button>
                       <button onClick={() => handleDelete(product.id)} className="p-1.5 rounded-lg hover:bg-red-900/30 text-surface-400 hover:text-red-400" title="Eliminar">
@@ -307,12 +340,12 @@ export function ProductsPage() {
                   <label className="block text-sm font-medium text-surface-300 mb-1.5">Categoría *</label>
                   <select value={formData.category} onChange={(e) => setFormData({ ...formData, category: e.target.value })} className="w-full bg-surface-800 border border-surface-700 rounded-lg px-4 py-2.5 text-white outline-none" required>
                     <option value="">Seleccionar...</option>
-                    {categories.map((cat) => <option key={cat} value={cat}>{cat}</option>)}
+                    {categories.map((cat) => <option key={cat.id} value={cat.id}>{cat.name}</option>)}
                   </select>
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-surface-300 mb-1.5">Unidad de venta</label>
-                  <select value={formData.unit} onChange={(e) => setFormData({ ...formData, unit: e.target.value })} className="w-full bg-surface-800 border border-surface-700 rounded-lg px-4 py-2.5 text-white outline-none">
+                  <select value={formData.unit} onChange={(e) => setFormData({ ...formData, unit: e.target.value as UnitFormValue })} className="w-full bg-surface-800 border border-surface-700 rounded-lg px-4 py-2.5 text-white outline-none">
                     <option value="uds">Unidad</option>
                     <option value="kg">Kilogramo</option>
                     <option value="g">Gramos</option>

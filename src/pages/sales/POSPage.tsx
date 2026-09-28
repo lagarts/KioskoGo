@@ -11,12 +11,18 @@ import {
   Banknote,
   Smartphone,
   Check,
+  Package,
+  AlertTriangle,
 } from 'lucide-react';
-import { Package } from 'lucide-react';
 import { Card } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
 import { Badge } from '../../components/ui/Badge';
 import { formatCurrency } from '../../utils/format';
+import { listProducts, type ProductWithCategory } from '../../services/products.service';
+import { listCategories, type CategoryWithCount } from '../../services/categories.service';
+import { getOpenRegister } from '../../services/cash.service';
+import { recordSale, type SaleItemInput } from '../../services/sales.service';
+import type { CashRegister, PaymentMethod } from '../../types';
 
 interface CartItem {
   id: string;
@@ -26,43 +32,7 @@ interface CartItem {
   unit: string;
 }
 
-const categories = [
-  { id: 'all', name: 'Todos', icon: '🏷️' },
-  { id: 'bebidas', name: 'Bebidas', icon: '🥤' },
-  { id: 'golosinas', name: 'Golosinas', icon: '🍬' },
-  { id: 'almacen', name: 'Almacén', icon: '🏪' },
-  { id: 'lacteos', name: 'Lácteos', icon: '🥛' },
-  { id: 'panaderia', name: 'Panadería', icon: '🍞' },
-  { id: 'carniceria', name: 'Carnicería', icon: '🥩' },
-  { id: 'limpieza', name: 'Limpieza', icon: '🧹' },
-  { id: 'dietetica', name: 'Dietética', icon: '🥗' },
-  { id: 'frescos', name: 'Frescos', icon: '🍎' },
-];
-
-const mockProducts = [
-  { id: '1', name: 'Coca Cola 500ml', price: 2500, category: 'bebidas', stock: 24, barcode: '77900001' },
-  { id: '2', name: 'Pepsi 500ml', price: 2300, category: 'bebidas', stock: 18, barcode: '77900002' },
-  { id: '3', name: 'Agua Mineral 500ml', price: 1200, category: 'bebidas', stock: 30, barcode: '77900003' },
-  { id: '4', name: 'Alfajor Havanna', price: 1200, category: 'golosinas', stock: 15, barcode: '77900004' },
-  { id: '5', name: 'Galletitas Oreo', price: 1800, category: 'golosinas', stock: 12, barcode: '77900005' },
-  { id: '6', name: 'Chocolate Milka', price: 2200, category: 'golosinas', stock: 8, barcode: '77900006' },
-  { id: '7', name: 'Yerba Mate 1kg', price: 2000, category: 'almacen', stock: 20, barcode: '77900007' },
-  { id: '8', name: 'Azúcar 1kg', price: 1500, category: 'almacen', stock: 25, barcode: '77900008' },
-  { id: '9', name: 'Harina 1kg', price: 1100, category: 'almacen', stock: 22, barcode: '77900009' },
-  { id: '10', name: 'Leche La Serenísima', price: 1500, category: 'lacteos', stock: 16, barcode: '77900010' },
-  { id: '11', name: 'Queso Cremoso /kg', price: 9500, category: 'lacteos', stock: 5, barcode: '77900011', unit: 'kg' },
-  { id: '12', name: 'Pan Francés', price: 1500, category: 'panaderia', stock: 30, barcode: '77900012' },
-  { id: '13', name: 'Medialunas x6', price: 3500, category: 'panaderia', stock: 10, barcode: '77900013' },
-  { id: '14', name: 'Carne /kg', price: 9500, category: 'carniceria', stock: 8, barcode: '77900014', unit: 'kg' },
-  { id: '15', name: 'Pollo Entero /kg', price: 5800, category: 'carniceria', stock: 10, barcode: '77900015', unit: 'kg' },
-  { id: '16', name: 'Detergente', price: 2800, category: 'limpieza', stock: 14, barcode: '77900016' },
-  { id: '17', name: 'Jabón en Barra', price: 900, category: 'limpieza', stock: 20, barcode: '77900017' },
-  { id: '18', name: 'Avena 500g', price: 1300, category: 'dietetica', stock: 12, barcode: '77900018' },
-  { id: '19', name: 'Miel 500ml', price: 3200, category: 'dietetica', stock: 6, barcode: '77900019' },
-  { id: '20', name: 'Manzanas /kg', price: 3500, category: 'frescos', stock: 15, barcode: '77900020', unit: 'kg' },
-];
-
-const paymentMethods = [
+const paymentMethods: { id: PaymentMethod; label: string; icon: React.ReactNode }[] = [
   { id: 'cash', label: 'Efectivo', icon: <Banknote size={18} /> },
   { id: 'debit', label: 'Tarjeta Débito', icon: <CreditCard size={18} /> },
   { id: 'credit', label: 'Tarjeta Crédito', icon: <CreditCard size={18} /> },
@@ -70,26 +40,70 @@ const paymentMethods = [
   { id: 'mercadopago', label: 'Mercado Pago', icon: <Smartphone size={18} /> },
 ];
 
+function unitLabel(unit: string): string {
+  if (unit === 'unit') return 'uds';
+  return unit;
+}
+
 export function POSPage() {
+  const [products, setProducts] = useState<ProductWithCategory[]>([]);
+  const [categories, setCategories] = useState<CategoryWithCount[]>([]);
+  const [register, setRegister] = useState<CashRegister | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState('');
   const [cart, setCart] = useState<CartItem[]>([]);
   const [search, setSearch] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('all');
   const [showPayment, setShowPayment] = useState(false);
-  const [selectedPayment, setSelectedPayment] = useState('cash');
+  const [selectedPayment, setSelectedPayment] = useState<PaymentMethod>('cash');
   const [amountPaid, setAmountPaid] = useState('');
+  const [saving, setSaving] = useState(false);
   const [saleComplete, setSaleComplete] = useState(false);
+  const [lastSaleNumber, setLastSaleNumber] = useState<number | null>(null);
+  const [lastSaleTotal, setLastSaleTotal] = useState(0);
   const searchRef = useRef<HTMLInputElement>(null);
+  const productsRef = useRef<ProductWithCategory[]>([]);
 
-  const filteredProducts = mockProducts.filter((p) => {
-    const matchSearch = p.name.toLowerCase().includes(search.toLowerCase()) || p.barcode.includes(search);
-    const matchCategory = selectedCategory === 'all' || p.category === selectedCategory;
+  useEffect(() => {
+    productsRef.current = products;
+  }, [products]);
+
+  const loadAll = async () => {
+    try {
+      setLoadError('');
+      const [prods, cats, openRegister] = await Promise.all([
+        listProducts(),
+        listCategories(),
+        getOpenRegister(),
+      ]);
+      setProducts(prods);
+      setCategories(cats);
+      setRegister(openRegister);
+    } catch (err) {
+      setLoadError(err instanceof Error ? err.message : 'Error cargando datos');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadAll();
+  }, []);
+
+  const activeProducts = products.filter((p) => p.active);
+
+  const filteredProducts = activeProducts.filter((p) => {
+    const matchSearch =
+      p.name.toLowerCase().includes(search.toLowerCase()) ||
+      (p.barcode ?? '').includes(search);
+    const matchCategory = selectedCategory === 'all' || p.category_id === selectedCategory;
     return matchSearch && matchCategory;
   });
 
   const cartTotal = cart.reduce((sum, item) => sum + item.price * item.quantity, 0);
   const cartItems = cart.reduce((sum, item) => sum + item.quantity, 0);
 
-  const addToCart = (product: typeof mockProducts[0]) => {
+  const addToCart = (product: ProductWithCategory) => {
     setCart((prev) => {
       const existing = prev.find((item) => item.id === product.id);
       if (existing) {
@@ -97,38 +111,78 @@ export function POSPage() {
           item.id === product.id ? { ...item, quantity: item.quantity + 1 } : item
         );
       }
-      return [...prev, { id: product.id, name: product.name, price: product.price, quantity: 1, unit: product.unit || 'uds' }];
+      return [
+        ...prev,
+        {
+          id: product.id,
+          name: product.name,
+          price: Number(product.price),
+          quantity: 1,
+          unit: unitLabel(product.unit),
+        },
+      ];
     });
   };
 
   const updateQuantity = (id: string, delta: number) => {
-    setCart((prev) => {
-      return prev
+    setCart((prev) =>
+      prev
         .map((item) =>
           item.id === id ? { ...item, quantity: Math.max(0, item.quantity + delta) } : item
         )
-        .filter((item) => item.quantity > 0);
-    });
+        .filter((item) => item.quantity > 0)
+    );
   };
 
   const removeItem = (id: string) => {
     setCart((prev) => prev.filter((item) => item.id !== id));
   };
 
-  const handleSale = () => {
-    setSaleComplete(true);
-    setTimeout(() => {
-      setSaleComplete(false);
+  const handleSale = async () => {
+    if (cart.length === 0 || saving) return;
+    if (selectedPayment === 'cash' && !register) return;
+
+    setSaving(true);
+    try {
+      const items: SaleItemInput[] = cart.map((item) => ({
+        product_id: item.id,
+        quantity: item.quantity,
+        unit_price: item.price,
+        total: item.price * item.quantity,
+      }));
+      const sale = await recordSale({
+        cash_register_id: register?.id ?? null,
+        payment_method: selectedPayment,
+        subtotal: cartTotal,
+        discount: 0,
+        tax: 0,
+        total: cartTotal,
+        items,
+      });
+      setLastSaleNumber(sale.number);
+      setLastSaleTotal(cartTotal);
+      setSaleComplete(true);
       setCart([]);
       setShowPayment(false);
       setSelectedPayment('cash');
       setAmountPaid('');
-    }, 2000);
+      const prods = await listProducts();
+      setProducts(prods);
+    } catch (err) {
+      alert(err instanceof Error ? err.message : 'No se pudo registrar la venta');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const resetSale = () => {
+    setSaleComplete(false);
+    setLastSaleNumber(null);
+    setLastSaleTotal(0);
   };
 
   const change = amountPaid ? Math.max(0, parseFloat(amountPaid) - cartTotal) : 0;
 
-  // Keyboard barcode listener
   useEffect(() => {
     let barcodeBuffer = '';
     let timeout: ReturnType<typeof setTimeout>;
@@ -137,7 +191,9 @@ export function POSPage() {
       if (document.activeElement === searchRef.current) return;
 
       if (e.key === 'Enter' && barcodeBuffer.length > 0) {
-        const product = mockProducts.find((p) => p.barcode === barcodeBuffer);
+        const product = productsRef.current.find(
+          (p) => p.barcode === barcodeBuffer && p.active
+        );
         if (product) {
           addToCart(product);
         }
@@ -148,7 +204,9 @@ export function POSPage() {
       if (e.key.length === 1) {
         barcodeBuffer += e.key;
         clearTimeout(timeout);
-        timeout = setTimeout(() => { barcodeBuffer = ''; }, 100);
+        timeout = setTimeout(() => {
+          barcodeBuffer = '';
+        }, 100);
       }
     };
 
@@ -159,7 +217,6 @@ export function POSPage() {
     };
   }, []);
 
-  // Keyboard shortcuts
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'F1') {
@@ -183,7 +240,25 @@ export function POSPage() {
             <Check size={40} className="text-white" />
           </div>
           <h2 className="text-2xl font-bold text-white mb-2">¡Venta completada!</h2>
-          <p className="text-surface-400">Total: {formatCurrency(cartTotal)}</p>
+          {lastSaleNumber !== null && (
+            <p className="text-surface-400 mb-1">Venta #{lastSaleNumber}</p>
+          )}
+          <p className="text-surface-400 mb-6">Total: {formatCurrency(lastSaleTotal)}</p>
+          <Button size="lg" onClick={resetSale}>
+            <Plus size={18} />
+            Nueva venta
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-[60vh]">
+        <div className="flex flex-col items-center gap-4">
+          <div className="w-10 h-10 border-3 border-kiosko-600 border-t-transparent rounded-full animate-spin" />
+          <p className="text-surface-400 text-sm">Cargando productos...</p>
         </div>
       </div>
     );
@@ -194,14 +269,11 @@ export function POSPage() {
       {/* Left: Cart */}
       <div className="w-full lg:w-[400px] xl:w-[450px] flex flex-col">
         <Card className="flex-1 flex flex-col overflow-hidden">
-          {/* Cart Header */}
           <div className="flex items-center justify-between pb-4 border-b border-surface-800">
             <div className="flex items-center gap-2">
               <ShoppingCart size={20} className="text-kiosko-500" />
               <h2 className="text-lg font-semibold text-white">Carrito</h2>
-              {cart.length > 0 && (
-                <Badge variant="info">{cartItems}</Badge>
-              )}
+              {cart.length > 0 && <Badge variant="info">{cartItems}</Badge>}
             </div>
             {cart.length > 0 && (
               <button
@@ -213,7 +285,6 @@ export function POSPage() {
             )}
           </div>
 
-          {/* Cart Items */}
           <div className="flex-1 overflow-y-auto py-3 space-y-2">
             {cart.length === 0 ? (
               <div className="flex flex-col items-center justify-center h-full text-surface-500">
@@ -223,10 +294,15 @@ export function POSPage() {
               </div>
             ) : (
               cart.map((item) => (
-                <div key={item.id} className="flex items-center gap-3 p-3 bg-surface-800/50 rounded-lg">
+                <div
+                  key={item.id}
+                  className="flex items-center gap-3 p-3 bg-surface-800/50 rounded-lg"
+                >
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-medium text-white truncate">{item.name}</p>
-                    <p className="text-xs text-surface-400">{formatCurrency(item.price)} / {item.unit}</p>
+                    <p className="text-xs text-surface-400">
+                      {formatCurrency(item.price)} / {item.unit}
+                    </p>
                   </div>
                   <div className="flex items-center gap-1">
                     <button
@@ -235,7 +311,9 @@ export function POSPage() {
                     >
                       <Minus size={14} />
                     </button>
-                    <span className="w-8 text-center text-sm font-medium text-white">{item.quantity}</span>
+                    <span className="w-8 text-center text-sm font-medium text-white">
+                      {item.quantity}
+                    </span>
                     <button
                       onClick={() => updateQuantity(item.id, 1)}
                       className="w-7 h-7 rounded-md bg-surface-700 hover:bg-surface-600 flex items-center justify-center text-white"
@@ -257,7 +335,6 @@ export function POSPage() {
             )}
           </div>
 
-          {/* Cart Footer */}
           {cart.length > 0 && (
             <div className="border-t border-surface-800 pt-3 space-y-3">
               <div className="flex items-center justify-between text-lg font-bold">
@@ -276,7 +353,6 @@ export function POSPage() {
       {/* Right: Products */}
       <div className="flex-1 flex flex-col min-w-0">
         <Card className="flex-1 flex flex-col overflow-hidden">
-          {/* Search */}
           <div className="flex items-center gap-3 pb-4 border-b border-surface-800">
             <div className="flex-1 flex items-center bg-surface-800 border border-surface-700 rounded-lg px-3 py-2">
               <Search size={16} className="text-surface-500 mr-2" />
@@ -289,7 +365,10 @@ export function POSPage() {
                 className="bg-transparent text-sm text-white placeholder-surface-500 outline-none w-full"
               />
               {search && (
-                <button onClick={() => setSearch('')} className="text-surface-500 hover:text-white">
+                <button
+                  onClick={() => setSearch('')}
+                  className="text-surface-500 hover:text-white"
+                >
                   <X size={14} />
                 </button>
               )}
@@ -302,17 +381,31 @@ export function POSPage() {
             </div>
           </div>
 
-          {/* Categories */}
           <div className="flex gap-2 py-3 overflow-x-auto no-scrollbar border-b border-surface-800">
+            <button
+              onClick={() => setSelectedCategory('all')}
+              className={`
+                flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap transition-colors
+                ${
+                  selectedCategory === 'all'
+                    ? 'bg-kiosko-600 text-black'
+                    : 'bg-surface-800 text-surface-300 hover:bg-surface-700'
+                }
+              `}
+            >
+              <span>🏷️</span>
+              <span>Todos</span>
+            </button>
             {categories.map((cat) => (
               <button
                 key={cat.id}
                 onClick={() => setSelectedCategory(cat.id)}
                 className={`
                   flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap transition-colors
-                  ${selectedCategory === cat.id
-                    ? 'bg-kiosko-600 text-black'
-                    : 'bg-surface-800 text-surface-300 hover:bg-surface-700'
+                  ${
+                    selectedCategory === cat.id
+                      ? 'bg-kiosko-600 text-black'
+                      : 'bg-surface-800 text-surface-300 hover:bg-surface-700'
                   }
                 `}
               >
@@ -322,8 +415,22 @@ export function POSPage() {
             ))}
           </div>
 
-          {/* Products Grid */}
           <div className="flex-1 overflow-y-auto py-3">
+            {loadError && (
+              <div className="bg-red-900/30 border border-red-800 text-red-400 text-sm px-4 py-3 rounded-lg mb-3">
+                {loadError}
+              </div>
+            )}
+            {!loadError && filteredProducts.length === 0 && (
+              <div className="flex flex-col items-center justify-center py-16 text-surface-500">
+                <Package size={40} className="mb-3 opacity-50" />
+                <p className="text-sm">
+                  {activeProducts.length === 0
+                    ? 'No hay productos cargados. Cargá productos para empezar a vender.'
+                    : 'No se encontraron productos'}
+                </p>
+              </div>
+            )}
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-2">
               {filteredProducts.map((product) => (
                 <button
@@ -334,12 +441,15 @@ export function POSPage() {
                   <div className="w-full aspect-square rounded-lg bg-surface-700/50 flex items-center justify-center mb-2 group-hover:bg-surface-700 transition-colors">
                     <Package size={24} className="text-surface-500" />
                   </div>
-                  <p className="text-xs font-medium text-white text-center line-clamp-2 w-full">{product.name}</p>
-                  <p className="text-sm font-bold text-kiosko-500 mt-1">{formatCurrency(product.price)}</p>
-                  {product.unit && (
-                    <span className="text-[10px] text-surface-500">por {product.unit}</span>
-                  )}
-                  <span className="text-[10px] text-surface-600 mt-0.5">Stock: {product.stock}</span>
+                  <p className="text-xs font-medium text-white text-center line-clamp-2 w-full">
+                    {product.name}
+                  </p>
+                  <p className="text-sm font-bold text-kiosko-500 mt-1">
+                    {formatCurrency(Number(product.price))}
+                  </p>
+                  <span className="text-[10px] text-surface-600 mt-0.5">
+                    Stock: {Number(product.stock)}
+                  </span>
                 </button>
               ))}
             </div>
@@ -350,21 +460,28 @@ export function POSPage() {
       {/* Payment Modal */}
       {showPayment && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-          <div className="absolute inset-0 bg-black/70" onClick={() => setShowPayment(false)} />
+          <div
+            className="absolute inset-0 bg-black/70"
+            onClick={() => !saving && setShowPayment(false)}
+          />
           <div className="relative bg-surface-900 border border-surface-700 rounded-2xl w-full max-w-lg p-6 space-y-4">
             <div className="flex items-center justify-between">
               <h2 className="text-xl font-bold text-white">Cobrar</h2>
-              <button onClick={() => setShowPayment(false)} className="text-surface-400 hover:text-white">
+              <button
+                onClick={() => setShowPayment(false)}
+                className="text-surface-400 hover:text-white"
+              >
                 <X size={20} />
               </button>
             </div>
 
             <div className="text-center py-4">
               <p className="text-sm text-surface-400">Total a cobrar</p>
-              <p className="text-4xl font-bold text-kiosko-500">{formatCurrency(cartTotal)}</p>
+              <p className="text-4xl font-bold text-kiosko-500">
+                {formatCurrency(cartTotal)}
+              </p>
             </div>
 
-            {/* Payment Methods */}
             <div className="grid grid-cols-3 gap-2">
               {paymentMethods.map((method) => (
                 <button
@@ -372,9 +489,10 @@ export function POSPage() {
                   onClick={() => setSelectedPayment(method.id)}
                   className={`
                     flex flex-col items-center gap-1.5 p-3 rounded-xl border transition-colors
-                    ${selectedPayment === method.id
-                      ? 'border-kiosko-600 bg-kiosko-600/10 text-kiosko-500'
-                      : 'border-surface-700 bg-surface-800 text-surface-300 hover:border-surface-600'
+                    ${
+                      selectedPayment === method.id
+                        ? 'border-kiosko-600 bg-kiosko-600/10 text-kiosko-500'
+                        : 'border-surface-700 bg-surface-800 text-surface-300 hover:border-surface-600'
                     }
                   `}
                 >
@@ -402,9 +520,22 @@ export function POSPage() {
               </div>
             )}
 
-            <Button fullWidth size="xl" onClick={handleSale}>
-              <Check size={20} />
-              Confirmar venta
+            {selectedPayment === 'cash' && !register && (
+              <div className="flex items-start gap-2 bg-yellow-900/20 border border-yellow-800 rounded-lg p-3">
+                <AlertTriangle size={16} className="text-yellow-400 shrink-0 mt-0.5" />
+                <p className="text-xs text-yellow-400">
+                  No hay caja abierta. Abrí la caja en la sección Caja para cobrar en efectivo.
+                </p>
+              </div>
+            )}
+
+            <Button
+              fullWidth
+              size="xl"
+              onClick={handleSale}
+              disabled={saving || cart.length === 0 || (selectedPayment === 'cash' && !register)}
+            >
+              {saving ? 'Registrando...' : <><Check size={20} /> Confirmar venta</>}
             </Button>
           </div>
         </div>

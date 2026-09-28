@@ -1,47 +1,93 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Truck, Plus, Search, Edit, Trash2, X, Phone, Mail, MapPin, Building2 } from 'lucide-react';
 import { Card } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Input';
+import { useAuth } from '../../contexts/AuthContext';
+import { listSuppliers, createSupplier, updateSupplier, deleteSupplier } from '../../services/suppliers.service';
+import type { Supplier } from '../../types';
 
-interface Supplier {
-  id: string;
-  name: string;
-  company: string;
-  phone: string;
-  email: string;
-  address: string;
-  cuit: string;
-  notes: string;
-}
-
-const mockSuppliers: Supplier[] = [
-  { id: '1', name: 'Distribuidora Norte', company: 'Distribuidora Norte S.A.', phone: '11-4444-1111', email: 'ventas@dnorte.com', address: 'Industrial 500', cuit: '30-70123456-9', notes: 'Bebidas y snacks' },
-  { id: '2', name: 'Frigorífico Sur', company: 'Frigorífico Sur S.R.L.', phone: '11-4444-2222', email: 'info@fsur.com', address: 'Mercado Central', cuit: '30-70987654-3', notes: 'Carnes y fiambres' },
-  { id: '3', name: 'Panadería Industrial', company: 'Panificadora Central', phone: '11-4444-3333', email: 'pedidos@pancentral.com', address: 'Av. La Plata 2000', cuit: '30-70555555-1', notes: 'Pan y pastelería' },
-  { id: '4', name: 'Lácteos del Valle', company: 'Lácteos del Valle S.A.', phone: '11-4444-4444', email: 'ventas@lvalle.com', address: 'Granja 100', cuit: '30-70777777-7', notes: 'Leche, queso, manteca' },
-];
+const emptyForm = { name: '', company: '', phone: '', email: '', address: '', cuit: '', notes: '' };
 
 export function SuppliersPage() {
-  const [suppliers, setSuppliers] = useState<Supplier[]>(mockSuppliers);
+  const { user } = useAuth();
+  const [suppliers, setSuppliers] = useState<Supplier[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState('');
   const [showForm, setShowForm] = useState(false);
   const [editing, setEditing] = useState<Supplier | null>(null);
-  const [form, setForm] = useState({ name: '', company: '', phone: '', email: '', address: '', cuit: '', notes: '' });
+  const [form, setForm] = useState(emptyForm);
 
-  const filtered = suppliers.filter((s) => s.name.toLowerCase().includes(search.toLowerCase()) || s.company.toLowerCase().includes(search.toLowerCase()));
+  useEffect(() => {
+    let active = true;
+    listSuppliers()
+      .then((data) => {
+        if (active) setSuppliers(data);
+      })
+      .catch((err) => {
+        if (active) setError(err instanceof Error ? err.message : 'Error al cargar los proveedores');
+      })
+      .finally(() => {
+        if (active) setLoading(false);
+      });
+    return () => {
+      active = false;
+    };
+  }, []);
 
-  const resetForm = () => { setForm({ name: '', company: '', phone: '', email: '', address: '', cuit: '', notes: '' }); setEditing(null); };
+  const filtered = suppliers.filter(
+    (s) => s.name.toLowerCase().includes(search.toLowerCase()) || (s.company ?? '').toLowerCase().includes(search.toLowerCase())
+  );
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const resetForm = () => {
+    setForm(emptyForm);
+    setEditing(null);
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (editing) {
-      setSuppliers((prev) => prev.map((s) => s.id === editing.id ? { ...s, ...form } : s));
-    } else {
-      setSuppliers((prev) => [...prev, { id: String(Date.now()), ...form }]);
+    if (!user) {
+      alert('No hay una sesión activa');
+      return;
     }
-    setShowForm(false);
-    resetForm();
+    try {
+      if (editing) {
+        await updateSupplier(editing.id, form);
+        setSuppliers((prev) => prev.map((s) => (s.id === editing.id ? { ...s, ...form } : s)));
+      } else {
+        const created = await createSupplier(form, user.business_id);
+        setSuppliers((prev) => [...prev, created]);
+      }
+      setShowForm(false);
+      resetForm();
+    } catch (err) {
+      alert(err instanceof Error ? err.message : 'Error al guardar el proveedor');
+    }
+  };
+
+  const handleDelete = async (supplier: Supplier) => {
+    if (!confirm('¿Estás seguro de eliminar este proveedor?')) return;
+    try {
+      await deleteSupplier(supplier.id);
+      setSuppliers((prev) => prev.filter((s) => s.id !== supplier.id));
+    } catch (err) {
+      alert(err instanceof Error ? err.message : 'Error al eliminar el proveedor');
+    }
+  };
+
+  const handleEdit = (sup: Supplier) => {
+    setEditing(sup);
+    setForm({
+      name: sup.name,
+      company: sup.company ?? '',
+      phone: sup.phone ?? '',
+      email: sup.email ?? '',
+      address: sup.address ?? '',
+      cuit: sup.cuit ?? '',
+      notes: sup.notes ?? '',
+    });
+    setShowForm(true);
   };
 
   return (
@@ -67,7 +113,12 @@ export function SuppliersPage() {
       </Card>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-        {suppliers.map((sup) => (
+        {loading && <p className="col-span-full text-center text-sm text-surface-400 py-8">Cargando...</p>}
+        {!loading && error && <p className="col-span-full text-center text-sm text-red-400 py-8">{error}</p>}
+        {!loading && !error && filtered.length === 0 && (
+          <p className="col-span-full text-center text-sm text-surface-400 py-8">No hay proveedores registrados</p>
+        )}
+        {!loading && !error && filtered.map((sup) => (
           <Card key={sup.id} className="hover:border-kiosko-600/30 transition-colors">
             <div className="flex items-start justify-between mb-3">
               <div className="flex items-center gap-3">
@@ -80,8 +131,8 @@ export function SuppliersPage() {
                 </div>
               </div>
               <div className="flex gap-1">
-                <button onClick={() => { setEditing(sup); setForm({ name: sup.name, company: sup.company, phone: sup.phone, email: sup.email, address: sup.address, cuit: sup.cuit, notes: sup.notes }); setShowForm(true); }} className="p-1.5 rounded-lg hover:bg-surface-700 text-surface-400 hover:text-white"><Edit size={14} /></button>
-                <button onClick={() => setSuppliers((prev) => prev.filter((s) => s.id !== sup.id))} className="p-1.5 rounded-lg hover:bg-red-900/30 text-surface-400 hover:text-red-400"><Trash2 size={14} /></button>
+                <button onClick={() => handleEdit(sup)} className="p-1.5 rounded-lg hover:bg-surface-700 text-surface-400 hover:text-white"><Edit size={14} /></button>
+                <button onClick={() => handleDelete(sup)} className="p-1.5 rounded-lg hover:bg-red-900/30 text-surface-400 hover:text-red-400"><Trash2 size={14} /></button>
               </div>
             </div>
             <div className="space-y-1.5 text-xs text-surface-400">

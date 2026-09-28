@@ -1,45 +1,80 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { ReceiptIcon, Plus, Trash2, X, Calendar, DollarSign } from 'lucide-react';
 import { Card } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
 import { Badge } from '../../components/ui/Badge';
 import { Input } from '../../components/ui/Input';
 import { formatCurrency, formatDate } from '../../utils/format';
-
-interface Expense {
-  id: string;
-  category: string;
-  amount: number;
-  description: string;
-  date: string;
-  user: string;
-}
+import { useAuth } from '../../contexts/AuthContext';
+import { listExpenses, createExpense, deleteExpense } from '../../services/expenses.service';
+import type { Expense } from '../../types';
 
 const expenseCategories = ['Alquiler', 'Luz', 'Internet', 'Sueldos', 'Proveedores', 'Impuestos', 'Mantenimiento', 'Transporte', 'Otros'];
 
-const mockExpenses: Expense[] = [
-  { id: '1', category: 'Alquiler', amount: 180000, description: 'Alquiler local comercial', date: '2026-09-01', user: 'Admin' },
-  { id: '2', category: 'Luz', amount: 25000, description: 'Factura de luz septiembre', date: '2026-09-05', user: 'Admin' },
-  { id: '3', category: 'Internet', amount: 8500, description: 'Fibra óptica 300mb', date: '2026-09-05', user: 'Admin' },
-  { id: '4', category: 'Sueldos', amount: 350000, description: 'Sueldo personal septiembre', date: '2026-09-10', user: 'Admin' },
-  { id: '5', category: 'Mantenimiento', amount: 12000, description: 'Reparación heladera', date: '2026-09-12', user: 'Admin' },
-];
+const emptyForm = { category: '', amount: '', description: '', date: '' };
+
+const todayForm = () => ({ ...emptyForm, date: new Date().toISOString().split('T')[0] });
 
 export function ExpensesPage() {
-  const [expenses, setExpenses] = useState<Expense[]>(mockExpenses);
+  const { user } = useAuth();
+  const [expenses, setExpenses] = useState<Expense[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [showForm, setShowForm] = useState(false);
-  const [form, setForm] = useState({ category: '', amount: '', description: '', date: new Date().toISOString().split('T')[0] });
+  const [form, setForm] = useState(todayForm());
+
+  useEffect(() => {
+    let active = true;
+    listExpenses()
+      .then((data) => {
+        if (active) setExpenses(data);
+      })
+      .catch((err) => {
+        if (active) setError(err instanceof Error ? err.message : 'Error al cargar los gastos');
+      })
+      .finally(() => {
+        if (active) setLoading(false);
+      });
+    return () => {
+      active = false;
+    };
+  }, []);
 
   const totalExpenses = expenses.reduce((sum, e) => sum + e.amount, 0);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setExpenses((prev) => [
-      { id: String(Date.now()), category: form.category, amount: parseFloat(form.amount) || 0, description: form.description, date: form.date, user: 'Admin' },
-      ...prev,
-    ]);
-    setShowForm(false);
-    setForm({ category: '', amount: '', description: '', date: new Date().toISOString().split('T')[0] });
+    if (!user) {
+      alert('No hay una sesión activa');
+      return;
+    }
+    try {
+      const created = await createExpense(
+        {
+          category: form.category,
+          amount: parseFloat(form.amount) || 0,
+          description: form.description,
+          date: form.date,
+        },
+        user.id,
+        user.business_id
+      );
+      setExpenses((prev) => [created, ...prev]);
+      setShowForm(false);
+      setForm(todayForm());
+    } catch (err) {
+      alert(err instanceof Error ? err.message : 'Error al registrar el gasto');
+    }
+  };
+
+  const handleDelete = async (expense: Expense) => {
+    if (!confirm('¿Estás seguro de eliminar este gasto?')) return;
+    try {
+      await deleteExpense(expense.id);
+      setExpenses((prev) => prev.filter((e) => e.id !== expense.id));
+    } catch (err) {
+      alert(err instanceof Error ? err.message : 'Error al eliminar el gasto');
+    }
   };
 
   return (
@@ -82,14 +117,29 @@ export function ExpensesPage() {
               </tr>
             </thead>
             <tbody>
-              {expenses.map((exp) => (
+              {loading && (
+                <tr>
+                  <td colSpan={5} className="px-4 py-6 text-center text-sm text-surface-400">Cargando...</td>
+                </tr>
+              )}
+              {!loading && error && (
+                <tr>
+                  <td colSpan={5} className="px-4 py-6 text-center text-sm text-red-400">{error}</td>
+                </tr>
+              )}
+              {!loading && !error && expenses.length === 0 && (
+                <tr>
+                  <td colSpan={5} className="px-4 py-6 text-center text-sm text-surface-400">Sin gastos registrados</td>
+                </tr>
+              )}
+              {!loading && !error && expenses.map((exp) => (
                 <tr key={exp.id} className="border-b border-surface-800/50 hover:bg-surface-800/30">
                   <td className="px-4 py-3 text-surface-300">{formatDate(exp.date)}</td>
                   <td className="px-4 py-3"><Badge>{exp.category}</Badge></td>
                   <td className="px-4 py-3 text-white">{exp.description}</td>
                   <td className="px-4 py-3 text-right font-semibold text-red-400">-{formatCurrency(exp.amount)}</td>
                   <td className="px-4 py-3 text-center">
-                    <button onClick={() => setExpenses((prev) => prev.filter((e) => e.id !== exp.id))} className="p-1.5 rounded-lg hover:bg-red-900/30 text-surface-400 hover:text-red-400">
+                    <button onClick={() => handleDelete(exp)} className="p-1.5 rounded-lg hover:bg-red-900/30 text-surface-400 hover:text-red-400">
                       <Trash2 size={14} />
                     </button>
                   </td>
