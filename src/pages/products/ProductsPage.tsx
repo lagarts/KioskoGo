@@ -9,6 +9,9 @@ import {
   Copy,
   X,
   Filter,
+  Camera,
+  Image as ImageIcon,
+  Upload,
 } from 'lucide-react';
 import { Card } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
@@ -21,6 +24,8 @@ import {
   createProduct,
   updateProduct,
   deleteProduct,
+  uploadProductImage,
+  removeProductImage,
   type ProductInput,
   type ProductWithCategory,
 } from '../../services/products.service';
@@ -48,6 +53,8 @@ export function ProductsPage() {
   const [categories, setCategories] = useState<CategoryWithCount[]>([]);
   const [branches, setBranches] = useState<Branch[]>([]);
   const [formBranches, setFormBranches] = useState<string[]>([]);
+  const [imageFile, setImageFile] = useState<File | null>(null);
+  const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState('');
@@ -104,7 +111,27 @@ export function ProductsPage() {
   const resetForm = () => {
     setFormData({ name: '', description: '', sku: '', barcode: '', category: '', cost: '', price: '', stock: '', minStock: '', unit: 'uds', tax: '21' });
     setFormBranches([]);
+    clearImage();
     setEditingProduct(null);
+  };
+
+  const clearImage = () => {
+    setImageFile(null);
+    setImagePreview((prev) => {
+      if (prev?.startsWith('blob:')) URL.revokeObjectURL(prev);
+      return null;
+    });
+  };
+
+  const handleImageFile = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file) return;
+    setImageFile(file);
+    setImagePreview((prev) => {
+      if (prev?.startsWith('blob:')) URL.revokeObjectURL(prev);
+      return URL.createObjectURL(file);
+    });
   };
 
   const buildInput = (): ProductInput => ({
@@ -124,13 +151,24 @@ export function ProductsPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
+      const input = buildInput();
+      if (imageFile && user) {
+        input.image = await uploadProductImage(user.business_id, imageFile);
+        if (editingProduct?.image) {
+          void removeProductImage(editingProduct.image).catch(() => undefined);
+        }
+      } else if (editingProduct?.image && !imagePreview) {
+        input.image = null;
+        void removeProductImage(editingProduct.image).catch(() => undefined);
+      }
+
       if (editingProduct) {
-        await updateProduct(editingProduct.id, buildInput());
+        await updateProduct(editingProduct.id, input);
         if (branches.length > 0) {
           await setProductBranches(editingProduct.id, formBranches);
         }
       } else {
-        const created = await createProduct(buildInput(), user!.business_id);
+        const created = await createProduct(input, user!.business_id);
         if (branches.length > 0) {
           await setProductBranches(created.id, formBranches);
         }
@@ -163,6 +201,8 @@ export function ProductsPage() {
     } catch {
       setFormBranches([]);
     }
+    setImageFile(null);
+    setImagePreview(product.image ?? null);
     setShowForm(true);
   };
 
@@ -294,9 +334,17 @@ export function ProductsPage() {
                 <tr key={product.id} className="border-b border-surface-800/50 hover:bg-surface-800/30 transition-colors">
                   <td className="px-4 py-3">
                     <div className="flex items-center gap-3">
-                      <div className="w-8 h-8 rounded-lg bg-surface-800 flex items-center justify-center shrink-0">
-                        <Package size={14} className="text-surface-500" />
-                      </div>
+                      {product.image ? (
+                        <img
+                          src={product.image}
+                          alt=""
+                          className="w-8 h-8 rounded-lg object-cover shrink-0 bg-surface-800"
+                        />
+                      ) : (
+                        <div className="w-8 h-8 rounded-lg bg-surface-800 flex items-center justify-center shrink-0">
+                          <Package size={14} className="text-surface-500" />
+                        </div>
+                      )}
                       <div className="min-w-0">
                         <p className="font-medium text-white truncate">{product.name}</p>
                         <p className="text-xs text-surface-500 truncate">{product.barcode}</p>
@@ -383,6 +431,59 @@ export function ProductsPage() {
                 <Input label="Stock actual" type="number" value={formData.stock} onChange={(e) => setFormData({ ...formData, stock: e.target.value })} />
                 <Input label="Stock mínimo" type="number" value={formData.minStock} onChange={(e) => setFormData({ ...formData, minStock: e.target.value })} />
                 <Input label="IVA (%)" type="number" value={formData.tax} onChange={(e) => setFormData({ ...formData, tax: e.target.value })} />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-surface-300 mb-1.5">
+                  Foto del producto
+                </label>
+                <div className="flex items-start gap-4">
+                  <div className="w-24 h-24 rounded-lg bg-surface-800 border border-surface-700 flex items-center justify-center overflow-hidden shrink-0">
+                    {imagePreview ? (
+                      <img src={imagePreview} alt="Vista previa" className="w-full h-full object-cover" />
+                    ) : (
+                      <ImageIcon size={26} className="text-surface-500" />
+                    )}
+                  </div>
+                  <div className="flex flex-col gap-2">
+                    <div className="flex flex-wrap gap-2">
+                      <label className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-surface-800 border border-surface-700 text-sm text-surface-300 hover:text-white hover:border-surface-600 cursor-pointer transition-colors">
+                        <Camera size={14} />
+                        Tomar foto
+                        <input
+                          type="file"
+                          accept="image/*"
+                          capture="environment"
+                          className="hidden"
+                          onChange={handleImageFile}
+                        />
+                      </label>
+                      <label className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-surface-800 border border-surface-700 text-sm text-surface-300 hover:text-white hover:border-surface-600 cursor-pointer transition-colors">
+                        <Upload size={14} />
+                        Elegir imagen
+                        <input
+                          type="file"
+                          accept="image/*"
+                          className="hidden"
+                          onChange={handleImageFile}
+                        />
+                      </label>
+                      {imagePreview && (
+                        <button
+                          type="button"
+                          onClick={clearImage}
+                          className="px-3 py-2 rounded-lg text-sm text-red-400 hover:bg-red-900/20 transition-colors"
+                        >
+                          Quitar
+                        </button>
+                      )}
+                    </div>
+                    <p className="text-xs text-surface-500">
+                      Sacá una foto con la cámara del celular o elegí una imagen. Se optimiza
+                      automáticamente.
+                    </p>
+                  </div>
+                </div>
               </div>
 
               {branches.length > 0 && (

@@ -1,5 +1,6 @@
 import { supabase } from '../lib/supabase';
 import type { Category, Product, UnitType } from '../types';
+import { resizeImage } from '../utils/image';
 
 export interface ProductInput {
   name: string;
@@ -13,6 +14,7 @@ export interface ProductInput {
   min_stock: number;
   unit: UnitType;
   tax: number;
+  image?: string | null;
 }
 
 export interface ProductWithCategory extends Product {
@@ -46,4 +48,25 @@ export async function updateProduct(id: string, input: Partial<ProductInput> & {
 export async function deleteProduct(id: string): Promise<void> {
   const { error } = await supabase.from('products').delete().eq('id', id);
   if (error) throw new Error(error.message);
+}
+
+const IMAGE_BUCKET = 'product-images';
+
+export async function uploadProductImage(businessId: string, file: File): Promise<string> {
+  const resized = await resizeImage(file);
+  const path = `${businessId}/${crypto.randomUUID()}.jpg`;
+  const { error } = await supabase.storage
+    .from(IMAGE_BUCKET)
+    .upload(path, resized, { contentType: 'image/jpeg', upsert: false });
+  if (error) throw new Error(error.message);
+  const { data } = supabase.storage.from(IMAGE_BUCKET).getPublicUrl(path);
+  return data.publicUrl;
+}
+
+export async function removeProductImage(publicUrl: string): Promise<void> {
+  const marker = `/object/public/${IMAGE_BUCKET}/`;
+  const index = publicUrl.indexOf(marker);
+  if (index === -1) return;
+  const path = publicUrl.slice(index + marker.length);
+  await supabase.storage.from(IMAGE_BUCKET).remove([path]);
 }
