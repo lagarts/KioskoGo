@@ -16,62 +16,21 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 const profileCache = new Map<string, Promise<User>>();
 
-async function ensureBusiness(profile: User): Promise<User> {
-  if (profile.business_id) return profile;
-
-  const { data: business, error } = await supabase
-    .from('businesses')
-    .insert({ name: profile.name || 'Mi Comercio', rubro: 'otro' })
-    .select('id')
-    .single();
-  if (error) throw new Error(error.message);
-
-  const { error: updError } = await supabase
-    .from('profiles')
-    .update({ business_id: business.id })
-    .eq('id', profile.id);
-  if (updError) throw new Error(updError.message);
-
-  const { error: whError } = await supabase
-    .from('warehouses')
-    .insert({ name: 'Local', is_default: true, business_id: business.id });
-  if (whError) console.error('No se pudo crear el depósito inicial:', whError.message);
-
-  await supabase.from('subscriptions').insert({ business_id: business.id });
-
-  return { ...profile, business_id: business.id };
-}
-
 async function getOrCreateProfile(authUser: SupabaseUser): Promise<User> {
-  const { data: existing, error: selError } = await supabase
-    .from('profiles')
-    .select('*')
-    .eq('id', authUser.id)
-    .maybeSingle();
-  if (selError) throw new Error(selError.message);
-
-  let profile = existing as User | null;
-  if (!profile) {
-    const fallbackName =
-      (authUser.user_metadata?.name as string | undefined) ||
-      authUser.email?.split('@')[0] ||
-      'Usuario';
-    const { data: created, error: insError } = await supabase
-      .from('profiles')
-      .insert({
-        id: authUser.id,
-        email: authUser.email ?? '',
-        name: fallbackName,
-        role: 'admin',
-        business_id: null,
-      })
-      .select('*')
-      .single();
-    if (insError) throw new Error(insError.message);
-    profile = created as User;
+  const { data, error } = await supabase.rpc('get_or_create_profile');
+  if (error) {
+    if (error.message.includes('get_or_create_profile')) {
+      throw new Error(
+        'El sistema no está actualizado: ejecutá el SQL supabase/get_or_create_profile.sql en Supabase.'
+      );
+    }
+    throw new Error(error.message);
   }
-
-  return ensureBusiness(profile);
+  const profile = (Array.isArray(data) ? data[0] : data) as User | undefined;
+  if (!profile || profile.id !== authUser.id) {
+    throw new Error('No se pudo cargar el perfil.');
+  }
+  return profile;
 }
 
 function loadProfile(authUser: SupabaseUser): Promise<User> {
