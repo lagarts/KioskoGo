@@ -25,23 +25,32 @@
   --color-surface-950: #121212;
 }
 
-* {
-  margin: 0;
-  padding: 0;
-  box-sizing: border-box;
-}
+@layer base {
+  html,
+  body,
+  #root {
+    height: 100%;
+    width: 100%;
+  }
 
-html, body, #root {
-  height: 100%;
-  width: 100%;
-}
+  body {
+    font-family: 'Inter', system-ui, -apple-system, sans-serif;
+    background-color: #0a0a0a;
+    color: #ffffff;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
 
-body {
-  font-family: 'Inter', system-ui, -apple-system, sans-serif;
-  background-color: #0a0a0a;
-  color: #ffffff;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
+  button {
+    cursor: pointer;
+  }
+
+  input:-webkit-autofill,
+  input:-webkit-autofill:hover,
+  input:-webkit-autofill:focus {
+    -webkit-box-shadow: 0 0 0px 1000px #1a1a1a inset;
+    -webkit-text-fill-color: #ffffff;
+  }
 }
 
 ::-webkit-scrollbar {
@@ -60,17 +69,6 @@ body {
 
 ::-webkit-scrollbar-thumb:hover {
   background: #555;
-}
-
-input:-webkit-autofill,
-input:-webkit-autofill:hover,
-input:-webkit-autofill:focus {
-  -webkit-box-shadow: 0 0 0px 1000px #1a1a1a inset;
-  -webkit-text-fill-color: #ffffff;
-}
-
-button {
-  cursor: pointer;
 }
 
 .no-scrollbar::-webkit-scrollbar {

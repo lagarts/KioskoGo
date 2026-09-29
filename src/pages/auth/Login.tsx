@@ -58,9 +58,9 @@ export function Login() {
       <div className="w-full max-w-sm">
         <div className="flex flex-col items-center mb-8">
           <img
-            src="/logo2.png"
+            src="/logo.png"
             alt="KioskoGo"
-            className="w-28 h-28 object-contain mb-5 drop-shadow-2xl"
+            className="w-24 h-24 object-contain mb-5 drop-shadow-2xl"
           />
           <h1 className="text-4xl font-extrabold text-kiosko-500 tracking-tight">KioskoGo</h1>
           <p className="text-surface-400 mt-2 text-sm">Sistema de gestión y punto de venta</p>

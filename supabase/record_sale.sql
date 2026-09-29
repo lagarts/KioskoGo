@@ -62,12 +62,15 @@ END;
 $$;
 
 -- 2. Policies adicionales
+DROP POLICY IF EXISTS "Users can insert own profile" ON profiles;
 CREATE POLICY "Users can insert own profile" ON profiles
   FOR INSERT WITH CHECK (id = auth.uid());
 
+DROP POLICY IF EXISTS "Admins can view business users" ON profiles;
 CREATE POLICY "Admins can view business users" ON profiles
   FOR SELECT USING (business_id = get_user_business_id() AND is_admin());
 
+DROP POLICY IF EXISTS "Users can insert own subscription" ON subscriptions;
 CREATE POLICY "Users can insert own subscription" ON subscriptions
   FOR INSERT WITH CHECK (business_id = get_user_business_id());
 

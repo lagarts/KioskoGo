@@ -426,175 +426,175 @@ CREATE TRIGGER on_auth_user_created
 -- ============================================
 
 -- Profiles: cada usuario ve su propio perfil
-CREATE POLICY "Users can view own profile" ON profiles
+DROP POLICY IF EXISTS "Users can view own profile" ON profiles; CREATE POLICY "Users can view own profile" ON profiles
   FOR SELECT USING (id = auth.uid());
 
-CREATE POLICY "Users can update own profile" ON profiles
+DROP POLICY IF EXISTS "Users can update own profile" ON profiles; CREATE POLICY "Users can update own profile" ON profiles
   FOR UPDATE USING (id = auth.uid());
 
 -- Businesses: usuarios ven su propio negocio
-CREATE POLICY "Users can view own business" ON businesses
+DROP POLICY IF EXISTS "Users can view own business" ON businesses; CREATE POLICY "Users can view own business" ON businesses
   FOR SELECT USING (id = get_user_business_id());
 
-CREATE POLICY "Admins can update own business" ON businesses
+DROP POLICY IF EXISTS "Admins can update own business" ON businesses; CREATE POLICY "Admins can update own business" ON businesses
   FOR UPDATE USING (id = get_user_business_id() AND is_admin());
 
-CREATE POLICY "Admins can insert business" ON businesses
+DROP POLICY IF EXISTS "Admins can insert business" ON businesses; CREATE POLICY "Admins can insert business" ON businesses
   FOR INSERT WITH CHECK (true);
 
 -- Categories: filtrado por business
-CREATE POLICY "Users can view own categories" ON categories
+DROP POLICY IF EXISTS "Users can view own categories" ON categories; CREATE POLICY "Users can view own categories" ON categories
   FOR SELECT USING (business_id = get_user_business_id());
 
-CREATE POLICY "Admins can manage categories" ON categories
+DROP POLICY IF EXISTS "Admins can manage categories" ON categories; CREATE POLICY "Admins can manage categories" ON categories
   FOR ALL USING (business_id = get_user_business_id() AND is_admin());
 
 -- Products: filtrado por business
-CREATE POLICY "Users can view own products" ON products
+DROP POLICY IF EXISTS "Users can view own products" ON products; CREATE POLICY "Users can view own products" ON products
   FOR SELECT USING (business_id = get_user_business_id());
 
-CREATE POLICY "Admins can manage products" ON products
+DROP POLICY IF EXISTS "Admins can manage products" ON products; CREATE POLICY "Admins can manage products" ON products
   FOR ALL USING (business_id = get_user_business_id() AND is_admin());
 
-CREATE POLICY "Encargados can manage products" ON products
+DROP POLICY IF EXISTS "Encargados can manage products" ON products; CREATE POLICY "Encargados can manage products" ON products
   FOR ALL USING (business_id = get_user_business_id() AND 
     EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND role IN ('admin', 'encargado')));
 
 -- Customers: filtrado por business
-CREATE POLICY "Users can view own customers" ON customers
+DROP POLICY IF EXISTS "Users can view own customers" ON customers; CREATE POLICY "Users can view own customers" ON customers
   FOR SELECT USING (business_id = get_user_business_id());
 
-CREATE POLICY "Users can manage customers" ON customers
+DROP POLICY IF EXISTS "Users can manage customers" ON customers; CREATE POLICY "Users can manage customers" ON customers
   FOR ALL USING (business_id = get_user_business_id());
 
 -- Suppliers: filtrado por business
-CREATE POLICY "Users can view own suppliers" ON suppliers
+DROP POLICY IF EXISTS "Users can view own suppliers" ON suppliers; CREATE POLICY "Users can view own suppliers" ON suppliers
   FOR SELECT USING (business_id = get_user_business_id());
 
-CREATE POLICY "Admins can manage suppliers" ON suppliers
+DROP POLICY IF EXISTS "Admins can manage suppliers" ON suppliers; CREATE POLICY "Admins can manage suppliers" ON suppliers
   FOR ALL USING (business_id = get_user_business_id() AND is_admin());
 
 -- Sales: filtrado por business
-CREATE POLICY "Users can view own sales" ON sales
+DROP POLICY IF EXISTS "Users can view own sales" ON sales; CREATE POLICY "Users can view own sales" ON sales
   FOR SELECT USING (business_id = get_user_business_id());
 
-CREATE POLICY "Users can create sales" ON sales
+DROP POLICY IF EXISTS "Users can create sales" ON sales; CREATE POLICY "Users can create sales" ON sales
   FOR INSERT WITH CHECK (business_id = get_user_business_id());
 
-CREATE POLICY "Admins can manage sales" ON sales
+DROP POLICY IF EXISTS "Admins can manage sales" ON sales; CREATE POLICY "Admins can manage sales" ON sales
   FOR ALL USING (business_id = get_user_business_id() AND is_admin());
 
 -- Sale Items: accesso a través de sale
-CREATE POLICY "Users can view sale items" ON sale_items
+DROP POLICY IF EXISTS "Users can view sale items" ON sale_items; CREATE POLICY "Users can view sale items" ON sale_items
   FOR SELECT USING (
     EXISTS (SELECT 1 FROM sales WHERE sales.id = sale_items.sale_id AND sales.business_id = get_user_business_id())
   );
 
-CREATE POLICY "Users can create sale items" ON sale_items
+DROP POLICY IF EXISTS "Users can create sale items" ON sale_items; CREATE POLICY "Users can create sale items" ON sale_items
   FOR INSERT WITH CHECK (
     EXISTS (SELECT 1 FROM sales WHERE sales.id = sale_items.sale_id AND sales.business_id = get_user_business_id())
   );
 
 -- Cash Registers: filtrado por business
-CREATE POLICY "Users can view own cash registers" ON cash_registers
+DROP POLICY IF EXISTS "Users can view own cash registers" ON cash_registers; CREATE POLICY "Users can view own cash registers" ON cash_registers
   FOR SELECT USING (business_id = get_user_business_id());
 
-CREATE POLICY "Users can manage cash registers" ON cash_registers
+DROP POLICY IF EXISTS "Users can manage cash registers" ON cash_registers; CREATE POLICY "Users can manage cash registers" ON cash_registers
   FOR ALL USING (business_id = get_user_business_id());
 
 -- Cash Movements: accesso a través de cash_register
-CREATE POLICY "Users can view cash movements" ON cash_movements
+DROP POLICY IF EXISTS "Users can view cash movements" ON cash_movements; CREATE POLICY "Users can view cash movements" ON cash_movements
   FOR SELECT USING (
     EXISTS (SELECT 1 FROM cash_registers WHERE cash_registers.id = cash_movements.cash_register_id AND cash_registers.business_id = get_user_business_id())
   );
 
-CREATE POLICY "Users can create cash movements" ON cash_movements
+DROP POLICY IF EXISTS "Users can create cash movements" ON cash_movements; CREATE POLICY "Users can create cash movements" ON cash_movements
   FOR INSERT WITH CHECK (
     EXISTS (SELECT 1 FROM cash_registers WHERE cash_registers.id = cash_movements.cash_register_id AND cash_registers.business_id = get_user_business_id())
   );
 
 -- Expenses: filtrado por business
-CREATE POLICY "Users can view own expenses" ON expenses
+DROP POLICY IF EXISTS "Users can view own expenses" ON expenses; CREATE POLICY "Users can view own expenses" ON expenses
   FOR SELECT USING (business_id = get_user_business_id());
 
-CREATE POLICY "Users can manage expenses" ON expenses
+DROP POLICY IF EXISTS "Users can manage expenses" ON expenses; CREATE POLICY "Users can manage expenses" ON expenses
   FOR ALL USING (business_id = get_user_business_id());
 
 -- Notifications: filtrado por user
-CREATE POLICY "Users can view own notifications" ON notifications
+DROP POLICY IF EXISTS "Users can view own notifications" ON notifications; CREATE POLICY "Users can view own notifications" ON notifications
   FOR SELECT USING (user_id = auth.uid());
 
-CREATE POLICY "Users can update own notifications" ON notifications
+DROP POLICY IF EXISTS "Users can update own notifications" ON notifications; CREATE POLICY "Users can update own notifications" ON notifications
   FOR UPDATE USING (user_id = auth.uid());
 
 -- Subscriptions: filtrado por business
-CREATE POLICY "Users can view own subscription" ON subscriptions
+DROP POLICY IF EXISTS "Users can view own subscription" ON subscriptions; CREATE POLICY "Users can view own subscription" ON subscriptions
   FOR SELECT USING (business_id = get_user_business_id());
 
 -- Warehouses: filtrado por business
-CREATE POLICY "Users can view own warehouses" ON warehouses
+DROP POLICY IF EXISTS "Users can view own warehouses" ON warehouses; CREATE POLICY "Users can view own warehouses" ON warehouses
   FOR SELECT USING (business_id = get_user_business_id());
 
-CREATE POLICY "Admins can manage warehouses" ON warehouses
+DROP POLICY IF EXISTS "Admins can manage warehouses" ON warehouses; CREATE POLICY "Admins can manage warehouses" ON warehouses
   FOR ALL USING (business_id = get_user_business_id() AND is_admin());
 
 -- Brands: filtrado por business
-CREATE POLICY "Users can view own brands" ON brands
+DROP POLICY IF EXISTS "Users can view own brands" ON brands; CREATE POLICY "Users can view own brands" ON brands
   FOR SELECT USING (business_id = get_user_business_id());
 
-CREATE POLICY "Admins can manage brands" ON brands
+DROP POLICY IF EXISTS "Admins can manage brands" ON brands; CREATE POLICY "Admins can manage brands" ON brands
   FOR ALL USING (business_id = get_user_business_id() AND is_admin());
 
 -- Stock Movements: filtrado por warehouse
-CREATE POLICY "Users can view stock movements" ON stock_movements
+DROP POLICY IF EXISTS "Users can view stock movements" ON stock_movements; CREATE POLICY "Users can view stock movements" ON stock_movements
   FOR SELECT USING (
     EXISTS (SELECT 1 FROM warehouses WHERE warehouses.id = stock_movements.warehouse_id AND warehouses.business_id = get_user_business_id())
   );
 
-CREATE POLICY "Users can create stock movements" ON stock_movements
+DROP POLICY IF EXISTS "Users can create stock movements" ON stock_movements; CREATE POLICY "Users can create stock movements" ON stock_movements
   FOR INSERT WITH CHECK (
     EXISTS (SELECT 1 FROM warehouses WHERE warehouses.id = stock_movements.warehouse_id AND warehouses.business_id = get_user_business_id())
   );
 
 -- Stock Transfers: filtrado por business
-CREATE POLICY "Users can view own transfers" ON stock_transfers
+DROP POLICY IF EXISTS "Users can view own transfers" ON stock_transfers; CREATE POLICY "Users can view own transfers" ON stock_transfers
   FOR SELECT USING (business_id = get_user_business_id());
 
-CREATE POLICY "Users can manage transfers" ON stock_transfers
+DROP POLICY IF EXISTS "Users can manage transfers" ON stock_transfers; CREATE POLICY "Users can manage transfers" ON stock_transfers
   FOR ALL USING (business_id = get_user_business_id());
 
 -- Purchases: filtrado por business
-CREATE POLICY "Users can view own purchases" ON purchases
+DROP POLICY IF EXISTS "Users can view own purchases" ON purchases; CREATE POLICY "Users can view own purchases" ON purchases
   FOR SELECT USING (business_id = get_user_business_id());
 
-CREATE POLICY "Users can manage purchases" ON purchases
+DROP POLICY IF EXISTS "Users can manage purchases" ON purchases; CREATE POLICY "Users can manage purchases" ON purchases
   FOR ALL USING (business_id = get_user_business_id());
 
 -- Purchase Items: accesso a través de purchase
-CREATE POLICY "Users can view purchase items" ON purchase_items
+DROP POLICY IF EXISTS "Users can view purchase items" ON purchase_items; CREATE POLICY "Users can view purchase items" ON purchase_items
   FOR SELECT USING (
     EXISTS (SELECT 1 FROM purchases WHERE purchases.id = purchase_items.purchase_id AND purchases.business_id = get_user_business_id())
   );
 
-CREATE POLICY "Users can create purchase items" ON purchase_items
+DROP POLICY IF EXISTS "Users can create purchase items" ON purchase_items; CREATE POLICY "Users can create purchase items" ON purchase_items
   FOR INSERT WITH CHECK (
     EXISTS (SELECT 1 FROM purchases WHERE purchases.id = purchase_items.purchase_id AND purchases.business_id = get_user_business_id())
   );
 
 -- Support Tickets: filtrado por user
-CREATE POLICY "Users can view own tickets" ON support_tickets
+DROP POLICY IF EXISTS "Users can view own tickets" ON support_tickets; CREATE POLICY "Users can view own tickets" ON support_tickets
   FOR SELECT USING (user_id = auth.uid());
 
-CREATE POLICY "Users can create tickets" ON support_tickets
+DROP POLICY IF EXISTS "Users can create tickets" ON support_tickets; CREATE POLICY "Users can create tickets" ON support_tickets
   FOR INSERT WITH CHECK (user_id = auth.uid() AND business_id = get_user_business_id());
 
 -- Product Variants: filtrado por product
-CREATE POLICY "Users can view variants" ON product_variants
+DROP POLICY IF EXISTS "Users can view variants" ON product_variants; CREATE POLICY "Users can view variants" ON product_variants
   FOR SELECT USING (
     EXISTS (SELECT 1 FROM products WHERE products.id = product_variants.product_id AND products.business_id = get_user_business_id())
   );
 
-CREATE POLICY "Users can manage variants" ON product_variants
+DROP POLICY IF EXISTS "Users can manage variants" ON product_variants; CREATE POLICY "Users can manage variants" ON product_variants
   FOR ALL USING (
     EXISTS (SELECT 1 FROM products WHERE products.id = product_variants.product_id AND products.business_id = get_user_business_id())
   );
