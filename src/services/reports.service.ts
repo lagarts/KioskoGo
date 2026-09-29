@@ -1,137 +1,161 @@
 import { supabase } from '../lib/supabase';
 
-export interface DayAmount {
-  day: string;
-  amount: number;
+export type ReportKey = 'caja' | 'mes' | 'anio' | 'cajero' | 'ranking' | 'sucursales';
+
+export interface ReportRow {
+  key: string;
+  label: string;
+  sublabel?: string;
+  count: number;
+  total: number;
 }
 
-export interface PaymentBreakdown {
-  method: string;
-  amount: number;
-  percentage: number;
+export interface ReportResult {
+  title: string;
+  grandCount: number;
+  grandTotal: number;
+  rows: ReportRow[];
 }
 
-export interface ReportsData {
-  monthSalesTotal: number;
-  monthExpensesTotal: number;
-  itemsSold: number;
-  avgTicket: number;
-  salesByDay: DayAmount[];
-  salesByPayment: PaymentBreakdown[];
-  topProducts: { name: string; sold: number; revenue: number }[];
-  stockStatus: { normal: number; low: number; out: number };
+interface SaleRow {
+  id: string;
+  number: number;
+  total: string | number;
+  created_at: string;
+  user_id: string;
+  cash_register_id: string | null;
+  branch_id: string | null;
+  profiles?: { name: string } | null;
+  branches?: { name: string } | null;
+  cash_registers?: { name: string } | null;
 }
 
-const DAY_LABELS = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'];
-const PAYMENT_LABELS: Record<string, string> = {
-  cash: 'Efectivo',
-  debit: 'Tarjeta Débito',
-  credit: 'Tarjeta Crédito',
-  transfer: 'Transferencia',
-  mercadopago: 'Mercado Pago',
-  account: 'Cuenta Corriente',
-  other: 'Otro',
+interface ItemRow {
+  quantity: string | number;
+  total: string | number;
+  products?: { name: string } | null;
+}
+
+const MONTH_LABELS = [
+  'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
+  'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre',
+];
+
+const REPORT_TITLES: Record<ReportKey, string> = {
+  caja: 'Historial por caja',
+  mes: 'Historial por mes',
+  anio: 'Historial por año',
+  cajero: 'Historial por cajero',
+  ranking: 'Ranking de productos',
+  sucursales: 'Ventas por sucursal',
 };
 
-function startOfMonth(): string {
-  const d = new Date();
-  d.setDate(1);
-  d.setHours(0, 0, 0, 0);
-  return d.toISOString();
+interface GroupSpec {
+  key: string;
+  label: string;
+  sublabel?: string;
 }
 
-function daysAgoIso(days: number): string {
-  const d = new Date();
-  d.setDate(d.getDate() - days);
-  d.setHours(0, 0, 0, 0);
-  return d.toISOString();
+async function fetchSales(): Promise<SaleRow[]> {
+  const { data, error } = await supabase
+    .from('sales')
+    .select(
+      'id, number, total, created_at, user_id, cash_register_id, branch_id, profiles(name), branches(name), cash_registers(name)'
+    )
+    .eq('status', 'completed')
+    .order('created_at', { ascending: false });
+  if (error) throw new Error(error.message);
+  return (data ?? []) as unknown as SaleRow[];
 }
 
-export async function getReportsData(): Promise<ReportsData> {
-  const monthIso = startOfMonth();
-  const weekIso = daysAgoIso(6);
-
-  const [monthSalesRes, expensesRes, productsRes, weekSalesRes] = await Promise.all([
-    supabase.from('sales').select('id, total, payment_method, created_at').eq('status', 'completed').gte('created_at', monthIso),
-    supabase.from('expenses').select('amount').gte('date', monthIso.slice(0, 10)),
-    supabase.from('products').select('stock, min_stock'),
-    supabase.from('sales').select('total, payment_method, created_at').eq('status', 'completed').gte('created_at', weekIso),
-  ]);
-
-  if (monthSalesRes.error) throw new Error(monthSalesRes.error.message);
-  if (expensesRes.error) throw new Error(expensesRes.error.message);
-  if (productsRes.error) throw new Error(productsRes.error.message);
-  if (weekSalesRes.error) throw new Error(weekSalesRes.error.message);
-
-  const monthSales = monthSalesRes.data ?? [];
-  const monthSalesTotal = monthSales.reduce((sum, row) => sum + Number(row.total), 0);
-  const monthExpensesTotal = (expensesRes.data ?? []).reduce((sum, row) => sum + Number(row.amount), 0);
-  const avgTicket = monthSales.length > 0 ? monthSalesTotal / monthSales.length : 0;
-
-  const salesByDay: DayAmount[] = [];
-  for (let i = 6; i >= 0; i--) {
-    const day = new Date();
-    day.setDate(day.getDate() - i);
-    const dayIso = new Date(day);
-    dayIso.setHours(0, 0, 0, 0);
-    const next = new Date(dayIso);
-    next.setDate(next.getDate() + 1);
-    const amount = (weekSalesRes.data ?? [])
-      .filter((row) => {
-        const created = new Date(row.created_at);
-        return created >= dayIso && created < next;
-      })
-      .reduce((sum, row) => sum + Number(row.total), 0);
-    salesByDay.push({ day: DAY_LABELS[day.getDay()], amount });
+function aggregate(rows: SaleRow[], groupOf: (row: SaleRow) => GroupSpec): ReportRow[] {
+  const map = new Map<string, ReportRow>();
+  for (const row of rows) {
+    const group = groupOf(row);
+    const entry = map.get(group.key) ?? {
+      key: group.key,
+      label: group.label,
+      sublabel: group.sublabel,
+      count: 0,
+      total: 0,
+    };
+    entry.count += 1;
+    entry.total += Number(row.total);
+    map.set(group.key, entry);
   }
+  return [...map.values()];
+}
 
-  const byMethod = new Map<string, number>();
-  for (const row of monthSales) {
-    byMethod.set(row.payment_method, (byMethod.get(row.payment_method) ?? 0) + Number(row.total));
-  }
-  const salesByPayment: PaymentBreakdown[] = [...byMethod.entries()]
-    .map(([method, amount]) => ({
-      method: PAYMENT_LABELS[method] ?? method,
-      amount,
-      percentage: monthSalesTotal > 0 ? Math.round((amount / monthSalesTotal) * 100) : 0,
-    }))
-    .sort((a, b) => b.amount - a.amount);
+export async function getReport(key: ReportKey, businessId: string): Promise<ReportResult> {
+  const title = REPORT_TITLES[key];
 
-  const monthIds = monthSales.map((row) => row.id as string);
-  const topMap = new Map<string, { name: string; sold: number; revenue: number }>();
-  if (monthIds.length > 0) {
-    const itemsRes = await supabase
+  if (key === 'ranking') {
+    const { data, error } = await supabase
       .from('sale_items')
-      .select('quantity, total, products(name)')
-      .in('sale_id', monthIds);
-    if (itemsRes.error) throw new Error(itemsRes.error.message);
-    for (const item of itemsRes.data ?? []) {
-      const product = item.products as unknown as { name: string } | null;
-      if (!product) continue;
-      const entry = topMap.get(product.name) ?? { name: product.name, sold: 0, revenue: 0 };
-      entry.sold += Number(item.quantity);
-      entry.revenue += Number(item.total);
-      topMap.set(product.name, entry);
+      .select('quantity, total, products(name), sales!inner(business_id)')
+      .eq('sales.business_id', businessId);
+    if (error) throw new Error(error.message);
+
+    const map = new Map<string, ReportRow>();
+    for (const item of (data ?? []) as unknown as ItemRow[]) {
+      const name = item.products?.name ?? 'Producto eliminado';
+      const entry = map.get(name) ?? { key: name, label: name, count: 0, total: 0 };
+      entry.count += Number(item.quantity);
+      entry.total += Number(item.total);
+      map.set(name, entry);
     }
+    const rows = [...map.values()].sort((a, b) => b.count - a.count).slice(0, 20);    return {
+      title,
+      grandCount: rows.reduce((sum, r) => sum + r.count, 0),
+      grandTotal: rows.reduce((sum, r) => sum + r.total, 0),
+      rows,
+    };
   }
 
-  const products = productsRes.data ?? [];
-  const stockStatus = {
-    normal: products.filter((p) => Number(p.stock) > Number(p.min_stock)).length,
-    low: products.filter((p) => Number(p.stock) <= Number(p.min_stock) && Number(p.stock) > 0).length,
-    out: products.filter((p) => Number(p.stock) <= 0).length,
-  };
+  const sales = await fetchSales();
+  let rows: ReportRow[];
 
-  const itemsSold = [...topMap.values()].reduce((sum, p) => sum + p.sold, 0);
+  switch (key) {
+    case 'caja':
+      rows = aggregate(sales, (row) => ({
+        key: row.cash_register_id ?? 'sin-caja',
+        label: row.cash_registers?.name ?? 'Caja sin nombre',
+        sublabel: row.branches?.name ?? undefined,
+      })).sort((a, b) => b.total - a.total);
+      break;
+    case 'mes':
+      rows = aggregate(sales, (row) => {
+        const d = new Date(row.created_at);
+        const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+        return { key, label: `${MONTH_LABELS[d.getMonth()]} ${d.getFullYear()}` };
+      }).sort((a, b) => b.key.localeCompare(a.key));
+      break;
+    case 'anio':
+      rows = aggregate(sales, (row) => {
+        const key = String(new Date(row.created_at).getFullYear());
+        return { key, label: key };
+      }).sort((a, b) => b.key.localeCompare(a.key));
+      break;
+    case 'cajero':
+      rows = aggregate(sales, (row) => ({
+        key: row.user_id,
+        label: row.profiles?.name ?? 'Usuario',
+      })).sort((a, b) => b.total - a.total);
+      break;
+    case 'sucursales':
+      rows = aggregate(sales, (row) => ({
+        key: row.branch_id ?? 'sin-sucursal',
+        label: row.branches?.name ?? 'Sin sucursal',
+      })).sort((a, b) => b.total - a.total);
+      break;
+    default:
+      rows = [];
+  }
 
   return {
-    monthSalesTotal,
-    monthExpensesTotal,
-    itemsSold,
-    avgTicket,
-    salesByDay,
-    salesByPayment,
-    topProducts: [...topMap.values()].sort((a, b) => b.sold - a.sold).slice(0, 5),
-    stockStatus,
+    title,
+    grandCount: sales.length,
+    grandTotal: sales.reduce((sum, row) => sum + Number(row.total), 0),
+    rows,
   };
 }

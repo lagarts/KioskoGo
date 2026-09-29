@@ -13,6 +13,8 @@ import { SuppliersPage } from './pages/suppliers/SuppliersPage';
 import { ReportsPage } from './pages/reports/ReportsPage';
 import { ExpensesPage } from './pages/expenses/ExpensesPage';
 import { AdminPage } from './pages/admin/AdminPage';
+import { BranchesPage } from './pages/branches/BranchesPage';
+import { CashiersPage } from './pages/cashiers/CashiersPage';
 import { PlaceholderPage } from './pages/PlaceholderPage';
 import {
   Warehouse,
@@ -214,6 +216,24 @@ function App() {
         element={
           <ProtectedRoute>
             <MainLayout><AdminPage /></MainLayout>
+          </ProtectedRoute>
+        }
+      />
+
+      <Route
+        path="/branches"
+        element={
+          <ProtectedRoute>
+            <MainLayout><BranchesPage /></MainLayout>
+          </ProtectedRoute>
+        }
+      />
+
+      <Route
+        path="/cashiers"
+        element={
+          <ProtectedRoute>
+            <MainLayout><CashiersPage /></MainLayout>
           </ProtectedRoute>
         }
       />

@@ -161,12 +161,14 @@ export function Header({ onMenuClick }: HeaderProps) {
                 <p className="text-xs text-surface-500">{user?.email}</p>
               </div>
               <div className="py-1">
-                <button
-                  onClick={handleSettings}
-                  className="w-full px-4 py-2 text-sm text-left text-surface-300 hover:bg-surface-800"
-                >
-                  Configuración
-                </button>
+                {user?.role !== 'cajero' && (
+                  <button
+                    onClick={handleSettings}
+                    className="w-full px-4 py-2 text-sm text-left text-surface-300 hover:bg-surface-800"
+                  >
+                    Configuración
+                  </button>
+                )}
                 <button
                   onClick={handleSignOut}
                   className="w-full px-4 py-2 text-sm text-left text-red-400 hover:bg-red-900/20"

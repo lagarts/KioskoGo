@@ -128,6 +128,7 @@ export interface Sale {
   payment_method: PaymentMethod;
   status: SaleStatus;
   notes?: string;
+  branch_id?: string | null;
   business_id: string;
   created_at: string;
 }
@@ -155,9 +156,10 @@ export interface CashRegister {
   closing_amount?: number;
   expected_amount?: number;
   difference?: number;
+  observations?: string;
   opened_at: string;
   closed_at?: string;
-  observations?: string;
+  branch_id?: string | null;
   business_id: string;
 }
 
@@ -223,6 +225,15 @@ export interface Warehouse {
   address?: string;
   is_default: boolean;
   business_id: string;
+}
+
+export interface Branch {
+  id: string;
+  business_id: string;
+  name: string;
+  address?: string | null;
+  active: boolean;
+  created_at: string;
 }
 
 export interface StockTransfer {

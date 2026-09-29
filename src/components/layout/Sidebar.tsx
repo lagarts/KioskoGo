@@ -24,9 +24,13 @@ import {
   ChevronLeft,
   ChevronRight,
   X,
+  Building2,
+  UserCog,
 } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { isSuperadmin } from '../../lib/admin';
+import { CAJERO_ALLOWED_PATHS } from '../../lib/roles';
+import type { UserRole } from '../../types';
 
 interface SidebarProps {
   collapsed: boolean;
@@ -41,6 +45,7 @@ interface MenuItem {
   icon: React.ReactNode;
   badge?: number;
   adminOnly?: boolean;
+  roles?: UserRole[];
 }
 
 const menuSections: { title?: string; items: MenuItem[] }[] = [
@@ -58,6 +63,7 @@ const menuSections: { title?: string; items: MenuItem[] }[] = [
       { label: 'Categorías', path: '/categories', icon: <Tag size={20} /> },
       { label: 'Clientes', path: '/customers', icon: <Users size={20} /> },
       { label: 'Proveedores', path: '/suppliers', icon: <Truck size={20} /> },
+      { label: 'Sucursales', path: '/branches', icon: <Building2 size={20} />, roles: ['admin'] },
     ],
   },
   {
@@ -84,6 +90,7 @@ const menuSections: { title?: string; items: MenuItem[] }[] = [
     title: 'Sistema',
     items: [
       { label: 'Configuración', path: '/settings', icon: <Settings size={20} /> },
+      { label: 'Cajeros', path: '/cashiers', icon: <UserCog size={20} />, roles: ['admin'] },
       { label: 'Admin', path: '/admin', icon: <Shield size={20} />, adminOnly: true },
       { label: 'Soporte', path: '/support', icon: <HelpCircle size={20} /> },
     ],
@@ -98,7 +105,12 @@ export function Sidebar({ collapsed, onToggle, mobileOpen, onMobileClose }: Side
   const visibleSections = menuSections
     .map((section) => ({
       ...section,
-      items: section.items.filter((item) => !item.adminOnly || superadmin),
+      items: section.items.filter((item) => {
+        if (user?.role === 'cajero' && !CAJERO_ALLOWED_PATHS.includes(item.path)) return false;
+        if (item.roles && (!user?.role || !item.roles.includes(user.role))) return false;
+        if (item.adminOnly && !superadmin) return false;
+        return true;
+      }),
     }))
     .filter((section) => section.items.length > 0);
 

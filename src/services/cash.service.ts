@@ -15,7 +15,8 @@ export async function getOpenRegister(): Promise<CashRegister | null> {
 export async function openRegister(
   openingAmount: number,
   userId: string,
-  businessId: string
+  businessId: string,
+  branchId?: string | null
 ): Promise<CashRegister> {
   const { data, error } = await supabase
     .from('cash_registers')
@@ -24,6 +25,7 @@ export async function openRegister(
       user_id: userId,
       status: 'open',
       opening_amount: openingAmount,
+      branch_id: branchId ?? null,
       business_id: businessId,
     })
     .select('*')

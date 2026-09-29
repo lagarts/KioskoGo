@@ -9,6 +9,7 @@ import {
   TrendingDown,
   Clock,
   User,
+  Building2,
 } from 'lucide-react';
 import { Card } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
@@ -22,7 +23,8 @@ import {
   closeRegister,
   listMovements,
 } from '../../services/cash.service';
-import type { CashMovement, CashRegister } from '../../types';
+import { listBranches } from '../../services/branches.service';
+import type { Branch, CashMovement, CashRegister } from '../../types';
 
 interface MovementWithUser extends CashMovement {
   profiles?: { name: string } | null;
@@ -41,6 +43,8 @@ export function CashPage() {
   const [saving, setSaving] = useState(false);
   const [showOpenModal, setShowOpenModal] = useState(false);
   const [showCloseModal, setShowCloseModal] = useState(false);
+  const [branches, setBranches] = useState<Branch[]>([]);
+  const [selectedBranch, setSelectedBranch] = useState('');
 
   const loadMovements = useCallback(async (registerId: string) => {
     const data = await listMovements(registerId);
@@ -51,7 +55,12 @@ export function CashPage() {
     (async () => {
       try {
         setError('');
-        const open = await getOpenRegister();
+        const [open, branchList] = await Promise.all([
+          getOpenRegister(),
+          listBranches().catch(() => [] as Branch[]),
+        ]);
+        setBranches(branchList.filter((b) => b.active));
+        setSelectedBranch(branchList.find((b) => b.active)?.id ?? '');
         setRegister(open);
         if (open) {
           await loadMovements(open.id);
@@ -66,10 +75,14 @@ export function CashPage() {
 
   const handleOpenCash = async () => {
     if (!user || saving) return;
+    if (branches.length > 0 && !selectedBranch) {
+      alert('Seleccioná la sucursal de la caja');
+      return;
+    }
     setSaving(true);
     try {
       const amount = parseFloat(openingAmount) || 0;
-      const newRegister = await openRegister(amount, user.id, user.business_id);
+      const newRegister = await openRegister(amount, user.id, user.business_id, selectedBranch || null);
       setRegister(newRegister);
       setMovements([]);
       setShowOpenModal(false);
@@ -167,6 +180,26 @@ export function CashPage() {
                 onChange={(e) => setOpeningAmount(e.target.value)}
                 icon={<Wallet size={16} />}
               />
+              {branches.length > 0 && (
+                <div>
+                  <label className="block text-sm font-medium text-surface-300 mb-1.5">
+                    Sucursal *
+                  </label>
+                  <select
+                    value={selectedBranch}
+                    onChange={(e) => setSelectedBranch(e.target.value)}
+                    className="w-full bg-surface-800 border border-surface-700 rounded-lg px-4 py-2.5 text-white outline-none"
+                    required
+                  >
+                    <option value="">Seleccionar sucursal...</option>
+                    {branches.map((branch) => (
+                      <option key={branch.id} value={branch.id}>
+                        {branch.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
               <div className="text-sm text-surface-400">
                 <p>Fecha: {new Date().toLocaleDateString('es-AR')}</p>
                 <p>Hora: {new Date().toLocaleTimeString('es-AR')}</p>
@@ -196,8 +229,14 @@ export function CashPage() {
           </div>
           <div>
             <h1 className="text-2xl font-bold text-white">Caja</h1>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 flex-wrap">
               <Badge variant="success">Abierta</Badge>
+              {register.branch_id && (
+                <Badge variant="info">
+                  <Building2 size={10} className="mr-1" />
+                  {branches.find((b) => b.id === register.branch_id)?.name ?? 'Sucursal'}
+                </Badge>
+              )}
               <span className="text-xs text-surface-500">
                 desde {formatDateTime(register.opened_at)}
               </span>

@@ -25,7 +25,12 @@ import {
   type ProductWithCategory,
 } from '../../services/products.service';
 import { listCategories, type CategoryWithCount } from '../../services/categories.service';
-import type { UnitType } from '../../types';
+import {
+  listBranches,
+  getProductBranches,
+  setProductBranches,
+} from '../../services/branches.service';
+import type { Branch, UnitType } from '../../types';
 
 type UnitFormValue = 'uds' | 'kg' | 'g' | 'l' | 'ml' | 'm';
 
@@ -41,6 +46,8 @@ export function ProductsPage() {
   const { user } = useAuth();
   const [products, setProducts] = useState<ProductWithCategory[]>([]);
   const [categories, setCategories] = useState<CategoryWithCount[]>([]);
+  const [branches, setBranches] = useState<Branch[]>([]);
+  const [formBranches, setFormBranches] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState('');
@@ -65,9 +72,14 @@ export function ProductsPage() {
     setLoading(true);
     setError(null);
     try {
-      const [prods, cats] = await Promise.all([listProducts(), listCategories()]);
+      const [prods, cats, branchList] = await Promise.all([
+        listProducts(),
+        listCategories(),
+        listBranches().catch(() => [] as Branch[]),
+      ]);
       setProducts(prods);
       setCategories(cats);
+      setBranches(branchList.filter((b) => b.active));
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Error al cargar los datos');
     } finally {
@@ -91,6 +103,7 @@ export function ProductsPage() {
 
   const resetForm = () => {
     setFormData({ name: '', description: '', sku: '', barcode: '', category: '', cost: '', price: '', stock: '', minStock: '', unit: 'uds', tax: '21' });
+    setFormBranches([]);
     setEditingProduct(null);
   };
 
@@ -113,8 +126,14 @@ export function ProductsPage() {
     try {
       if (editingProduct) {
         await updateProduct(editingProduct.id, buildInput());
+        if (branches.length > 0) {
+          await setProductBranches(editingProduct.id, formBranches);
+        }
       } else {
-        await createProduct(buildInput(), user!.business_id);
+        const created = await createProduct(buildInput(), user!.business_id);
+        if (branches.length > 0) {
+          await setProductBranches(created.id, formBranches);
+        }
       }
       setShowForm(false);
       resetForm();
@@ -124,7 +143,7 @@ export function ProductsPage() {
     }
   };
 
-  const handleEdit = (product: ProductWithCategory) => {
+  const handleEdit = async (product: ProductWithCategory) => {
     setEditingProduct(product);
     setFormData({
       name: product.name,
@@ -139,6 +158,11 @@ export function ProductsPage() {
       unit: toFormUnit(product.unit),
       tax: String(product.tax),
     });
+    try {
+      setFormBranches(await getProductBranches(product.id));
+    } catch {
+      setFormBranches([]);
+    }
     setShowForm(true);
   };
 
@@ -360,6 +384,40 @@ export function ProductsPage() {
                 <Input label="Stock mínimo" type="number" value={formData.minStock} onChange={(e) => setFormData({ ...formData, minStock: e.target.value })} />
                 <Input label="IVA (%)" type="number" value={formData.tax} onChange={(e) => setFormData({ ...formData, tax: e.target.value })} />
               </div>
+
+              {branches.length > 0 && (
+                <div>
+                  <label className="block text-sm font-medium text-surface-300 mb-1.5">Sucursales</label>
+                  <div className="flex flex-wrap gap-2">
+                    {branches.map((branch) => {
+                      const checked = formBranches.includes(branch.id);
+                      return (
+                        <button
+                          type="button"
+                          key={branch.id}
+                          onClick={() =>
+                            setFormBranches((prev) =>
+                              checked
+                                ? prev.filter((id) => id !== branch.id)
+                                : [...prev, branch.id]
+                            )
+                          }
+                          className={`px-3 py-1.5 rounded-lg text-sm border transition-colors ${
+                            checked
+                              ? 'bg-kiosko-600/15 border-kiosko-600 text-kiosko-500 font-medium'
+                              : 'bg-surface-800 border-surface-700 text-surface-400 hover:text-white'
+                          }`}
+                        >
+                          {branch.name}
+                        </button>
+                      );
+                    })}
+                  </div>
+                  <p className="text-xs text-surface-500 mt-1.5">
+                    Sin selección: el producto aplica a todas las sucursales.
+                  </p>
+                </div>
+              )}
 
               <div className="flex gap-3 pt-4">
                 <Button type="button" variant="secondary" fullWidth onClick={() => { setShowForm(false); resetForm(); }}>
