@@ -26,6 +26,7 @@ import {
   X,
 } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
+import { isSuperadmin } from '../../lib/admin';
 
 interface SidebarProps {
   collapsed: boolean;
@@ -39,6 +40,7 @@ interface MenuItem {
   path: string;
   icon: React.ReactNode;
   badge?: number;
+  adminOnly?: boolean;
 }
 
 const menuSections: { title?: string; items: MenuItem[] }[] = [
@@ -82,7 +84,7 @@ const menuSections: { title?: string; items: MenuItem[] }[] = [
     title: 'Sistema',
     items: [
       { label: 'Configuración', path: '/settings', icon: <Settings size={20} /> },
-      { label: 'Administración', path: '/admin', icon: <Shield size={20} /> },
+      { label: 'Admin', path: '/admin', icon: <Shield size={20} />, adminOnly: true },
       { label: 'Soporte', path: '/support', icon: <HelpCircle size={20} /> },
     ],
   },
@@ -90,7 +92,15 @@ const menuSections: { title?: string; items: MenuItem[] }[] = [
 
 export function Sidebar({ collapsed, onToggle, mobileOpen, onMobileClose }: SidebarProps) {
   const location = useLocation();
-  const { signOut } = useAuth();
+  const { signOut, user } = useAuth();
+  const superadmin = isSuperadmin(user?.email);
+
+  const visibleSections = menuSections
+    .map((section) => ({
+      ...section,
+      items: section.items.filter((item) => !item.adminOnly || superadmin),
+    }))
+    .filter((section) => section.items.length > 0);
 
   const sidebarContent = (
     <div className="flex flex-col h-full">
@@ -116,7 +126,7 @@ export function Sidebar({ collapsed, onToggle, mobileOpen, onMobileClose }: Side
 
       {/* Navigation */}
       <nav className="flex-1 overflow-y-auto py-3 px-2 no-scrollbar">
-        {menuSections.map((section, sectionIndex) => (
+        {visibleSections.map((section, sectionIndex) => (
           <div key={sectionIndex} className="mb-2">
             {section.title && !collapsed && (
               <div className="px-3 py-1.5 text-xs font-semibold text-surface-500 uppercase tracking-wider">

@@ -389,13 +389,21 @@ function SubscriptionSection() {
             <div>
               <p className="text-surface-400">Vencimiento</p>
               <p className="text-white font-medium">
-                {subscription.trial_end ? formatDate(subscription.trial_end) : '—'}
+                {subscription.trial_end
+                  ? formatDate(subscription.trial_end)
+                  : subscription.status === 'active'
+                    ? 'Ilimitado'
+                    : '—'}
               </p>
             </div>
             <div>
               <p className="text-surface-400">Días restantes</p>
               <p className="text-kiosko-500 font-bold">
-                {trialDaysLeft !== null ? `${trialDaysLeft} días` : '—'}
+                {trialDaysLeft !== null
+                  ? `${trialDaysLeft} días`
+                  : subscription.status === 'active'
+                    ? 'Ilimitado'
+                    : '—'}
               </p>
             </div>
             <div>

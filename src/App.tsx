@@ -12,6 +12,7 @@ import { CustomersPage } from './pages/customers/CustomersPage';
 import { SuppliersPage } from './pages/suppliers/SuppliersPage';
 import { ReportsPage } from './pages/reports/ReportsPage';
 import { ExpensesPage } from './pages/expenses/ExpensesPage';
+import { AdminPage } from './pages/admin/AdminPage';
 import { PlaceholderPage } from './pages/PlaceholderPage';
 import {
   Warehouse,
@@ -20,7 +21,6 @@ import {
   Ticket,
   CreditCard,
   FileText,
-  Shield,
   HelpCircle,
   Receipt,
   ShoppingCart as PurchaseIcon,
@@ -213,9 +213,7 @@ function App() {
         path="/admin"
         element={
           <ProtectedRoute>
-            <MainLayout>
-              <PlaceholderPage title="Administración" description="Panel administrativo de KioskoGo" icon={<Shield size={20} />} />
-            </MainLayout>
+            <MainLayout><AdminPage /></MainLayout>
           </ProtectedRoute>
         }
       />
