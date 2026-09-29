@@ -438,8 +438,17 @@ export function POSPage() {
                   onClick={() => addToCart(product)}
                   className="flex flex-col items-center p-3 rounded-xl bg-surface-800/50 border border-surface-700/50 hover:border-kiosko-600/50 hover:bg-surface-800 transition-all text-left group"
                 >
-                  <div className="w-full aspect-square rounded-lg bg-surface-700/50 flex items-center justify-center mb-2 group-hover:bg-surface-700 transition-colors">
-                    <Package size={24} className="text-surface-500" />
+                  <div className="w-full aspect-square rounded-lg bg-surface-700/50 flex items-center justify-center mb-2 overflow-hidden group-hover:bg-surface-700 transition-colors">
+                    {product.image ? (
+                      <img
+                        src={product.image}
+                        alt=""
+                        className="w-full h-full object-cover"
+                        loading="lazy"
+                      />
+                    ) : (
+                      <Package size={24} className="text-surface-500" />
+                    )}
                   </div>
                   <p className="text-xs font-medium text-white text-center line-clamp-2 w-full">
                     {product.name}
