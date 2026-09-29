@@ -19,7 +19,7 @@ import {
 import { Card } from '../components/ui/Card';
 import { Badge } from '../components/ui/Badge';
 import { getDashboardData, type DashboardData } from '../services/dashboard.service';
-import { formatCurrency, formatTime } from '../utils/format';
+import { formatCurrency } from '../utils/format';
 
 const quickActions = [
   { label: 'Cargar Ventas', path: '/sales/new', icon: <ShoppingCart size={24} />, color: 'bg-kiosko-600 text-black' },
@@ -34,16 +34,6 @@ const quickActions = [
   { label: 'Etiquetas', path: '/labels', icon: <Ticket size={24} />, color: 'bg-surface-800 text-kiosko-500' },
   { label: 'Configuración', path: '/settings', icon: <Settings size={24} />, color: 'bg-surface-800 text-kiosko-500' },
 ];
-
-const paymentMethodLabels: Record<string, string> = {
-  cash: 'Efectivo',
-  debit: 'Tarjeta Débito',
-  credit: 'Tarjeta Crédito',
-  transfer: 'Transferencia',
-  mercadopago: 'Mercado Pago',
-  account: 'Cuenta Corriente',
-  other: 'Otro',
-};
 
 export function Dashboard() {
   const [data, setData] = useState<DashboardData | null>(null);
@@ -164,68 +154,6 @@ export function Dashboard() {
           ))}
         </div>
       </Card>
-
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        <Card>
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-lg font-semibold text-white">Últimas ventas</h2>
-            <Link to="/sales" className="text-sm text-kiosko-500 hover:text-kiosko-400 font-medium">
-              Ver todas
-            </Link>
-          </div>
-          <div className="space-y-3">
-            {data.recentSales.length === 0 ? (
-              <p className="text-sm text-surface-500 text-center py-4">Todavía no hay ventas</p>
-            ) : (
-              data.recentSales.map((sale) => (
-                <div key={sale.id} className="flex items-center justify-between py-2 border-b border-surface-800/50 last:border-0">
-                  <div className="flex items-center gap-3">
-                    <div className="w-8 h-8 rounded-lg bg-surface-800 flex items-center justify-center">
-                      <Receipt size={14} className="text-surface-400" />
-                    </div>
-                    <div>
-                      <p className="text-sm font-medium text-white">
-                        #{sale.number} - {sale.customers?.name ?? 'Consumidor Final'}
-                      </p>
-                      <p className="text-xs text-surface-500">
-                        {formatTime(sale.created_at)} · {paymentMethodLabels[sale.payment_method] ?? sale.payment_method}
-                      </p>
-                    </div>
-                  </div>
-                  <span className="text-sm font-semibold text-kiosko-500">{formatCurrency(sale.total)}</span>
-                </div>
-              ))
-            )}
-          </div>
-        </Card>
-
-        <Card>
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-lg font-semibold text-white">Productos más vendidos</h2>
-            <Link to="/reports" className="text-sm text-kiosko-500 hover:text-kiosko-400 font-medium">
-              Ver reporte
-            </Link>
-          </div>
-          <div className="space-y-3">
-            {data.topProducts.length === 0 ? (
-              <p className="text-sm text-surface-500 text-center py-4">Sin ventas en el mes</p>
-            ) : (
-              data.topProducts.map((product, index) => (
-                <div key={product.name} className="flex items-center justify-between py-2 border-b border-surface-800/50 last:border-0">
-                  <div className="flex items-center gap-3">
-                    <span className="text-sm font-bold text-surface-500 w-6">#{index + 1}</span>
-                    <div>
-                      <p className="text-sm font-medium text-white">{product.name}</p>
-                      <p className="text-xs text-surface-500">{product.sold} vendidos</p>
-                    </div>
-                  </div>
-                  <span className="text-sm font-semibold text-kiosko-500">{formatCurrency(product.revenue)}</span>
-                </div>
-              ))
-            )}
-          </div>
-        </Card>
-      </div>
 
       <Card>
         <div className="flex items-center justify-between mb-4">
