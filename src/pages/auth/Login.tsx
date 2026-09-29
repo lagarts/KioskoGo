@@ -12,6 +12,7 @@ export function Login() {
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -39,6 +40,10 @@ export function Login() {
         await signIn(email, password);
         navigate('/');
       } else {
+        if (password !== confirmPassword) {
+          setError('Las contraseñas no coinciden');
+          return;
+        }
         const result = await signUp(email, password, name);
         if (result.needsConfirmation) {
           setInfo('Te enviamos un email para confirmar tu cuenta. Revisá tu bandeja de entrada.');
@@ -126,6 +131,28 @@ export function Login() {
               </button>
             </div>
 
+            {mode === 'signup' && (
+              <div className="relative">
+                <Input
+                  label="Confirmar contraseña"
+                  type={showPassword ? 'text' : 'password'}
+                  placeholder="••••••••"
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
+                  icon={<Lock size={16} />}
+                  required
+                  minLength={6}
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-3 top-[38px] text-surface-500 hover:text-white"
+                >
+                  {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                </button>
+              </div>
+            )}
+
             <Button type="submit" fullWidth size="lg" disabled={loading}>
               {loading
                 ? mode === 'login'
@@ -145,6 +172,7 @@ export function Login() {
                   setMode(mode === 'login' ? 'signup' : 'login');
                   setError('');
                   setInfo('');
+                  setConfirmPassword('');
                 }}
                 className="text-kiosko-500 hover:text-kiosko-400 font-medium"
               >
