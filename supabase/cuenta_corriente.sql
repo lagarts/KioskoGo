@@ -25,7 +25,7 @@ DECLARE
   item JSONB;
 BEGIN
   v_user_id := auth.uid();
-  SELECT business_id INTO v_business_id FROM profiles WHERE id = v_user_id;
+  SELECT business_id INTO v_business_id FROM profiles WHERE profiles.id = v_user_id;
   IF v_business_id IS NULL THEN
     RAISE EXCEPTION 'El usuario no tiene un comercio asociado';
   END IF;
@@ -35,7 +35,7 @@ BEGIN
   END IF;
 
   IF p_cash_register_id IS NOT NULL THEN
-    SELECT branch_id INTO v_branch_id FROM cash_registers WHERE id = p_cash_register_id;
+    SELECT branch_id INTO v_branch_id FROM cash_registers WHERE cash_registers.id = p_cash_register_id;
   END IF;
 
   INSERT INTO sales (user_id, customer_id, cash_register_id, branch_id, subtotal, discount, tax, total, payment_method, status, business_id)
@@ -56,15 +56,15 @@ BEGIN
     UPDATE products
     SET stock = GREATEST(stock - (item->>'quantity')::NUMERIC, 0),
         updated_at = NOW()
-    WHERE id = (item->>'product_id')::UUID
-      AND business_id = v_business_id;
+    WHERE products.id = (item->>'product_id')::UUID
+      AND products.business_id = v_business_id;
   END LOOP;
 
   IF p_payment_method = 'account' AND p_customer_id IS NOT NULL THEN
     UPDATE customers
     SET balance = balance + p_total
-    WHERE id = p_customer_id
-      AND business_id = v_business_id;
+    WHERE customers.id = p_customer_id
+      AND customers.business_id = v_business_id;
   END IF;
 
   IF p_payment_method = 'cash' AND p_cash_register_id IS NOT NULL THEN
