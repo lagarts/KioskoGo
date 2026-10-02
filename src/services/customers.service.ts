@@ -36,3 +36,12 @@ export async function deleteCustomer(id: string): Promise<void> {
   const { error } = await supabase.from('customers').delete().eq('id', id);
   if (error) throw new Error(error.message);
 }
+
+export async function payCustomerBalance(customerId: string, amount: number): Promise<number> {
+  const { data, error } = await supabase.rpc('pay_customer_balance', {
+    p_customer_id: customerId,
+    p_amount: amount,
+  });
+  if (error) throw new Error(error.message);
+  return Number(data ?? 0);
+}

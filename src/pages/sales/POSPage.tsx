@@ -10,6 +10,7 @@ import {
   CreditCard,
   Banknote,
   Smartphone,
+  Users,
   Check,
   Package,
   AlertTriangle,
@@ -21,9 +22,10 @@ import { CalculatorModal } from '../../components/ui/CalculatorModal';
 import { formatCurrency } from '../../utils/format';
 import { listProducts, type ProductWithCategory } from '../../services/products.service';
 import { listCategories, type CategoryWithCount } from '../../services/categories.service';
+import { listCustomers } from '../../services/customers.service';
 import { getOpenRegister } from '../../services/cash.service';
 import { recordSale, type SaleItemInput } from '../../services/sales.service';
-import type { CashRegister, PaymentMethod } from '../../types';
+import type { CashRegister, Customer, PaymentMethod } from '../../types';
 
 interface CartItem {
   id: string;
@@ -39,6 +41,7 @@ const paymentMethods: { id: PaymentMethod; label: string; icon: React.ReactNode 
   { id: 'credit', label: 'Tarjeta Crédito', icon: <CreditCard size={18} /> },
   { id: 'transfer', label: 'Transferencia', icon: <Smartphone size={18} /> },
   { id: 'mercadopago', label: 'Mercado Pago', icon: <Smartphone size={18} /> },
+  { id: 'account', label: 'Cuenta Corriente', icon: <Users size={18} /> },
 ];
 
 function unitLabel(unit: string): string {
@@ -49,6 +52,7 @@ function unitLabel(unit: string): string {
 export function POSPage() {
   const [products, setProducts] = useState<ProductWithCategory[]>([]);
   const [categories, setCategories] = useState<CategoryWithCount[]>([]);
+  const [customers, setCustomers] = useState<Customer[]>([]);
   const [register, setRegister] = useState<CashRegister | null>(null);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState('');
@@ -58,11 +62,14 @@ export function POSPage() {
   const [showPayment, setShowPayment] = useState(false);
   const [calcMode, setCalcMode] = useState<'basic' | 'amount' | null>(null);
   const [selectedPayment, setSelectedPayment] = useState<PaymentMethod>('cash');
+  const [selectedCustomerId, setSelectedCustomerId] = useState<string | null>(null);
+  const [customerSearch, setCustomerSearch] = useState('');
   const [amountPaid, setAmountPaid] = useState('');
   const [saving, setSaving] = useState(false);
   const [saleComplete, setSaleComplete] = useState(false);
   const [lastSaleNumber, setLastSaleNumber] = useState<number | null>(null);
   const [lastSaleTotal, setLastSaleTotal] = useState(0);
+  const [lastSaleCustomerName, setLastSaleCustomerName] = useState('');
   const searchRef = useRef<HTMLInputElement>(null);
   const productsRef = useRef<ProductWithCategory[]>([]);
   const calcOpenRef = useRef(false);
@@ -78,13 +85,15 @@ export function POSPage() {
   const loadAll = async () => {
     try {
       setLoadError('');
-      const [prods, cats, openRegister] = await Promise.all([
+      const [prods, cats, custs, openRegister] = await Promise.all([
         listProducts(),
         listCategories(),
+        listCustomers(),
         getOpenRegister(),
       ]);
       setProducts(prods);
       setCategories(cats);
+      setCustomers(custs);
       setRegister(openRegister);
     } catch (err) {
       setLoadError(err instanceof Error ? err.message : 'Error cargando datos');
@@ -109,6 +118,14 @@ export function POSPage() {
 
   const cartTotal = cart.reduce((sum, item) => sum + item.price * item.quantity, 0);
   const cartItems = cart.reduce((sum, item) => sum + item.quantity, 0);
+
+  const selectedCustomer = customers.find((c) => c.id === selectedCustomerId) ?? null;
+  const filteredCustomers = customers.filter(
+    (c) =>
+      c.name.toLowerCase().includes(customerSearch.toLowerCase()) ||
+      (c.dni ?? '').includes(customerSearch) ||
+      (c.phone ?? '').includes(customerSearch)
+  );
 
   const addToCart = (product: ProductWithCategory) => {
     setCart((prev) => {
@@ -148,6 +165,10 @@ export function POSPage() {
   const handleSale = async () => {
     if (cart.length === 0 || saving) return;
     if (selectedPayment === 'cash' && !register) return;
+    if (selectedPayment === 'account' && !selectedCustomer) {
+      alert('Elegí un cliente para cargar la venta a cuenta corriente');
+      return;
+    }
 
     setSaving(true);
     try {
@@ -159,6 +180,7 @@ export function POSPage() {
       }));
       const sale = await recordSale({
         cash_register_id: register?.id ?? null,
+        customer_id: selectedPayment === 'account' ? selectedCustomer!.id : null,
         payment_method: selectedPayment,
         subtotal: cartTotal,
         discount: 0,
@@ -168,13 +190,19 @@ export function POSPage() {
       });
       setLastSaleNumber(sale.number);
       setLastSaleTotal(cartTotal);
+      setLastSaleCustomerName(
+        selectedPayment === 'account' && selectedCustomer ? selectedCustomer.name : ''
+      );
       setSaleComplete(true);
       setCart([]);
       setShowPayment(false);
       setSelectedPayment('cash');
+      setSelectedCustomerId(null);
+      setCustomerSearch('');
       setAmountPaid('');
-      const prods = await listProducts();
+      const [prods, custs] = await Promise.all([listProducts(), listCustomers()]);
       setProducts(prods);
+      setCustomers(custs);
     } catch (err) {
       alert(err instanceof Error ? err.message : 'No se pudo registrar la venta');
     } finally {
@@ -186,6 +214,7 @@ export function POSPage() {
     setSaleComplete(false);
     setLastSaleNumber(null);
     setLastSaleTotal(0);
+    setLastSaleCustomerName('');
   };
 
   const change = amountPaid ? Math.max(0, parseFloat(amountPaid) - cartTotal) : 0;
@@ -251,8 +280,13 @@ export function POSPage() {
           {lastSaleNumber !== null && (
             <p className="text-surface-400 mb-1">Venta #{lastSaleNumber}</p>
           )}
-          <p className="text-surface-400 mb-6">Total: {formatCurrency(lastSaleTotal)}</p>
-          <Button size="lg" onClick={resetSale}>
+          <p className="text-surface-400 mb-1">Total: {formatCurrency(lastSaleTotal)}</p>
+          {lastSaleCustomerName && (
+            <p className="text-yellow-400 text-sm mb-6">
+              Cargado a cuenta corriente de {lastSaleCustomerName}
+            </p>
+          )}
+          <Button size="lg" onClick={resetSale} className={lastSaleCustomerName ? '' : 'mt-6'}>
             <Plus size={18} />
             Nueva venta
           </Button>
@@ -529,6 +563,80 @@ export function POSPage() {
               ))}
             </div>
 
+            {selectedPayment === 'account' && (
+              <div>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="text-sm text-surface-400">Cliente (obligatorio)</label>
+                  {selectedCustomer && (
+                    <button
+                      onClick={() => {
+                        setSelectedCustomerId(null);
+                        setCustomerSearch('');
+                      }}
+                      className="text-xs text-kiosko-500 hover:text-kiosko-400"
+                    >
+                      Cambiar cliente
+                    </button>
+                  )}
+                </div>
+
+                {selectedCustomer ? (
+                  <div className="bg-surface-800 border border-kiosko-600/50 rounded-lg p-3 flex items-center justify-between gap-3">
+                    <div className="min-w-0">
+                      <p className="text-sm font-medium text-white truncate">
+                        {selectedCustomer.name}
+                      </p>
+                      <p className="text-xs text-surface-400">
+                        {Number(selectedCustomer.balance) > 0
+                          ? `Saldo actual: ${formatCurrency(Number(selectedCustomer.balance))}`
+                          : 'Sin saldo pendiente'}
+                      </p>
+                    </div>
+                    <Users size={18} className="text-kiosko-500 shrink-0" />
+                  </div>
+                ) : (
+                  <>
+                    <div className="flex items-center bg-surface-800 border border-surface-700 rounded-lg px-3 py-2 mb-2">
+                      <Search size={14} className="text-surface-500 mr-2" />
+                      <input
+                        type="text"
+                        placeholder="Buscar cliente por nombre, DNI o teléfono..."
+                        value={customerSearch}
+                        onChange={(e) => setCustomerSearch(e.target.value)}
+                        className="bg-transparent text-sm text-white placeholder-surface-500 outline-none w-full"
+                        autoFocus
+                      />
+                    </div>
+                    <div className="max-h-36 overflow-y-auto space-y-1">
+                      {filteredCustomers.length === 0 && (
+                        <p className="text-xs text-surface-500 text-center py-3">
+                          No hay clientes cargados. Creá el cliente en la sección Clientes.
+                        </p>
+                      )}
+                      {filteredCustomers.slice(0, 20).map((c) => (
+                        <button
+                          key={c.id}
+                          onClick={() => setSelectedCustomerId(c.id)}
+                          className="w-full flex items-center justify-between gap-2 px-3 py-2 rounded-lg bg-surface-800 border border-surface-700 hover:border-kiosko-600/50 text-left transition-colors"
+                        >
+                          <span className="text-sm text-white truncate">{c.name}</span>
+                          {Number(c.balance) > 0 && (
+                            <span className="text-[10px] text-yellow-400 shrink-0">
+                              {formatCurrency(Number(c.balance))}
+                            </span>
+                          )}
+                        </button>
+                      ))}
+                    </div>
+                  </>
+                )}
+
+                <p className="text-xs text-surface-500 mt-2">
+                  El total se suma al saldo del cliente y se cobra más tarde desde Clientes.
+                </p>
+              </div>
+            )}
+
             {selectedPayment === 'cash' && (
               <div>
                 <div className="flex items-center justify-between mb-1">
@@ -569,7 +677,12 @@ export function POSPage() {
               fullWidth
               size="xl"
               onClick={handleSale}
-              disabled={saving || cart.length === 0 || (selectedPayment === 'cash' && !register)}
+              disabled={
+                saving ||
+                cart.length === 0 ||
+                (selectedPayment === 'cash' && !register) ||
+                (selectedPayment === 'account' && !selectedCustomer)
+              }
             >
               {saving ? 'Registrando...' : <><Check size={20} /> Confirmar venta</>}
             </Button>

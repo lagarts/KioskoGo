@@ -1,12 +1,12 @@
 import { useEffect, useState } from 'react';
-import { Users, Plus, Search, Edit, Trash2, X, Phone, Mail, MapPin } from 'lucide-react';
+import { Users, Plus, Search, Edit, Trash2, X, Phone, Mail, MapPin, Wallet } from 'lucide-react';
 import { Card } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
 import { Badge } from '../../components/ui/Badge';
 import { Input } from '../../components/ui/Input';
 import { formatCurrency } from '../../utils/format';
 import { useAuth } from '../../contexts/AuthContext';
-import { listCustomers, createCustomer, updateCustomer, deleteCustomer } from '../../services/customers.service';
+import { listCustomers, createCustomer, updateCustomer, deleteCustomer, payCustomerBalance } from '../../services/customers.service';
 import type { Customer } from '../../types';
 
 const emptyForm = { name: '', phone: '', email: '', dni: '', cuit: '', address: '', notes: '' };
@@ -20,6 +20,9 @@ export function CustomersPage() {
   const [showForm, setShowForm] = useState(false);
   const [editing, setEditing] = useState<Customer | null>(null);
   const [form, setForm] = useState(emptyForm);
+  const [paying, setPaying] = useState<Customer | null>(null);
+  const [payAmount, setPayAmount] = useState('');
+  const [payingSaving, setPayingSaving] = useState(false);
 
   useEffect(() => {
     let active = true;
@@ -78,6 +81,33 @@ export function CustomersPage() {
       setCustomers((prev) => prev.filter((c) => c.id !== customer.id));
     } catch (err) {
       alert(err instanceof Error ? err.message : 'Error al eliminar el cliente');
+    }
+  };
+
+  const handlePay = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!paying) return;
+    const amount = parseFloat(payAmount);
+    if (Number.isNaN(amount) || amount <= 0) {
+      alert('Ingresá un monto mayor a cero');
+      return;
+    }
+    if (amount > Number(paying.balance)) {
+      alert(`El monto no puede superar el saldo (${formatCurrency(Number(paying.balance))})`);
+      return;
+    }
+    setPayingSaving(true);
+    try {
+      const newBalance = await payCustomerBalance(paying.id, amount);
+      setCustomers((prev) =>
+        prev.map((c) => (c.id === paying.id ? { ...c, balance: newBalance } : c))
+      );
+      setPaying(null);
+      setPayAmount('');
+    } catch (err) {
+      alert(err instanceof Error ? err.message : 'No se pudo registrar el cobro');
+    } finally {
+      setPayingSaving(false);
     }
   };
 
@@ -147,11 +177,25 @@ export function CustomersPage() {
               {customer.email && <div className="flex items-center gap-2"><Mail size={12} />{customer.email}</div>}
               {customer.address && <div className="flex items-center gap-2"><MapPin size={12} />{customer.address}</div>}
             </div>
-            {customer.balance !== 0 && (
-              <div className="mt-3 pt-3 border-t border-surface-800">
-                <Badge variant={customer.balance < 0 ? 'danger' : 'success'}>
-                  Saldo: {formatCurrency(customer.balance)}
+            {Number(customer.balance) !== 0 && (
+              <div className="mt-3 pt-3 border-t border-surface-800 space-y-2">
+                <Badge variant={Number(customer.balance) > 0 ? 'danger' : 'success'}>
+                  {Number(customer.balance) > 0
+                    ? `Debe: ${formatCurrency(Number(customer.balance))}`
+                    : `A favor: ${formatCurrency(Number(customer.balance))}`}
                 </Badge>
+                {Number(customer.balance) > 0 && (
+                  <button
+                    onClick={() => {
+                      setPaying(customer);
+                      setPayAmount('');
+                    }}
+                    className="w-full flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg bg-green-600 hover:bg-green-500 text-white text-xs font-medium transition-colors"
+                  >
+                    <Wallet size={13} />
+                    Cobrar saldo
+                  </button>
+                )}
               </div>
             )}
           </Card>
@@ -179,6 +223,63 @@ export function CustomersPage() {
               <div className="flex gap-3 pt-2">
                 <Button type="button" variant="secondary" fullWidth onClick={() => { setShowForm(false); resetForm(); }}>Cancelar</Button>
                 <Button type="submit" fullWidth>{editing ? 'Guardar' : 'Crear'}</Button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {paying && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div
+            className="absolute inset-0 bg-black/70"
+            onClick={() => {
+              if (!payingSaving) setPaying(null);
+            }}
+          />
+          <div className="relative bg-surface-900 border border-surface-700 rounded-2xl w-full max-w-sm p-6 space-y-4">
+            <div className="flex items-center justify-between">
+              <h2 className="text-lg font-bold text-white">Cobrar saldo</h2>
+              <button
+                onClick={() => setPaying(null)}
+                className="text-surface-400 hover:text-white"
+                disabled={payingSaving}
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            <div className="bg-surface-800 border border-surface-700 rounded-lg p-3">
+              <p className="text-sm font-medium text-white">{paying.name}</p>
+              <p className="text-xs text-red-400 mt-0.5">
+                Debe: {formatCurrency(Number(paying.balance))}
+              </p>
+            </div>
+
+            <form onSubmit={handlePay} className="space-y-4">
+              <Input
+                label="Monto a cobrar *"
+                type="number"
+                min="0.01"
+                step="0.01"
+                value={payAmount}
+                onChange={(e) => setPayAmount(e.target.value)}
+                placeholder="0"
+                required
+              />
+              <div className="flex gap-3">
+                <Button
+                  type="button"
+                  variant="secondary"
+                  fullWidth
+                  onClick={() => setPaying(null)}
+                  disabled={payingSaving}
+                >
+                  Cancelar
+                </Button>
+                <Button type="submit" fullWidth disabled={payingSaving}>
+                  {payingSaving ? 'Registrando...' : 'Cobrar'}
+                </Button>
               </div>
             </form>
           </div>
