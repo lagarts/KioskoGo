@@ -64,12 +64,14 @@ export function POSPage() {
   const [selectedPayment, setSelectedPayment] = useState<PaymentMethod>('cash');
   const [selectedCustomerId, setSelectedCustomerId] = useState<string | null>(null);
   const [customerSearch, setCustomerSearch] = useState('');
+  const [accountPaid, setAccountPaid] = useState('');
   const [amountPaid, setAmountPaid] = useState('');
   const [saving, setSaving] = useState(false);
   const [saleComplete, setSaleComplete] = useState(false);
   const [lastSaleNumber, setLastSaleNumber] = useState<number | null>(null);
   const [lastSaleTotal, setLastSaleTotal] = useState(0);
   const [lastSaleCustomerName, setLastSaleCustomerName] = useState('');
+  const [lastSalePaid, setLastSalePaid] = useState(0);
   const searchRef = useRef<HTMLInputElement>(null);
   const productsRef = useRef<ProductWithCategory[]>([]);
   const calcOpenRef = useRef(false);
@@ -126,6 +128,11 @@ export function POSPage() {
       (c.dni ?? '').includes(customerSearch) ||
       (c.phone ?? '').includes(customerSearch)
   );
+  const accountPaidAmount =
+    selectedPayment === 'account' && accountPaid.trim() !== ''
+      ? Math.max(0, parseFloat(accountPaid) || 0)
+      : 0;
+  const chargedToAccount = cartTotal - accountPaidAmount;
 
   const addToCart = (product: ProductWithCategory) => {
     setCart((prev) => {
@@ -186,6 +193,7 @@ export function POSPage() {
         discount: 0,
         tax: 0,
         total: cartTotal,
+        amount_paid: selectedPayment === 'account' ? accountPaidAmount : 0,
         items,
       });
       setLastSaleNumber(sale.number);
@@ -193,12 +201,14 @@ export function POSPage() {
       setLastSaleCustomerName(
         selectedPayment === 'account' && selectedCustomer ? selectedCustomer.name : ''
       );
+      setLastSalePaid(selectedPayment === 'account' ? accountPaidAmount : 0);
       setSaleComplete(true);
       setCart([]);
       setShowPayment(false);
       setSelectedPayment('cash');
       setSelectedCustomerId(null);
       setCustomerSearch('');
+      setAccountPaid('');
       setAmountPaid('');
       const [prods, custs] = await Promise.all([listProducts(), listCustomers()]);
       setProducts(prods);
@@ -215,6 +225,7 @@ export function POSPage() {
     setLastSaleNumber(null);
     setLastSaleTotal(0);
     setLastSaleCustomerName('');
+    setLastSalePaid(0);
   };
 
   const change = amountPaid ? Math.max(0, parseFloat(amountPaid) - cartTotal) : 0;
@@ -282,11 +293,20 @@ export function POSPage() {
           )}
           <p className="text-surface-400 mb-1">Total: {formatCurrency(lastSaleTotal)}</p>
           {lastSaleCustomerName && (
-            <p className="text-yellow-400 text-sm mb-6">
+            <p className="text-yellow-400 text-sm mb-1">
               Cargado a cuenta corriente de {lastSaleCustomerName}
             </p>
           )}
-          <Button size="lg" onClick={resetSale} className={lastSaleCustomerName ? '' : 'mt-6'}>
+          {lastSalePaid > 0 && (
+            <p className="text-green-400 text-sm mb-6">
+              Abonó {formatCurrency(lastSalePaid)} en el momento
+            </p>
+          )}
+          <Button
+            size="lg"
+            onClick={resetSale}
+            className={lastSaleCustomerName || lastSalePaid > 0 ? '' : 'mt-6'}
+          >
             <Plus size={18} />
             Nueva venta
           </Button>
@@ -572,6 +592,7 @@ export function POSPage() {
                       onClick={() => {
                         setSelectedCustomerId(null);
                         setCustomerSearch('');
+                        setAccountPaid('');
                       }}
                       className="text-xs text-kiosko-500 hover:text-kiosko-400"
                     >
@@ -631,8 +652,63 @@ export function POSPage() {
                   </>
                 )}
 
+                {selectedCustomer && (
+                  <div className="mt-3">
+                    <label className="block text-sm text-surface-400 mb-1">
+                      Abona ahora (opcional)
+                    </label>
+                    <input
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      value={accountPaid}
+                      onChange={(e) => setAccountPaid(e.target.value)}
+                      placeholder="0"
+                      className="w-full bg-surface-800 border border-surface-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-kiosko-500/50"
+                    />
+                    {accountPaidAmount > 0 && (
+                      <div className="mt-2 space-y-1 text-xs">
+                        <div className="flex justify-between">
+                          <span className="text-surface-400">Cobro en el momento</span>
+                          <span className="text-green-400 font-medium">
+                            {formatCurrency(accountPaidAmount)}
+                          </span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-surface-400">
+                            {chargedToAccount >= 0 ? 'Se carga a cuenta' : 'Aplica a deuda anterior'}
+                          </span>
+                          <span
+                            className={
+                              chargedToAccount >= 0 ? 'text-yellow-400 font-medium' : 'text-sky-400 font-medium'
+                            }
+                          >
+                            {formatCurrency(chargedToAccount)}
+                          </span>
+                        </div>
+                        <div className="flex justify-between border-t border-surface-800 pt-1">
+                          <span className="text-surface-400">Nuevo saldo del cliente</span>
+                          <span className="text-white font-medium">
+                            {formatCurrency(Number(selectedCustomer.balance) + chargedToAccount)}
+                          </span>
+                        </div>
+                      </div>
+                    )}
+                    {accountPaidAmount > 0 && !register && (
+                      <div className="flex items-start gap-2 bg-yellow-900/20 border border-yellow-800 rounded-lg p-2 mt-2">
+                        <AlertTriangle size={14} className="text-yellow-400 shrink-0 mt-0.5" />
+                        <p className="text-xs text-yellow-400">
+                          No hay caja abierta: el abono no quedará registrado en movimientos de caja.
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                )}
+
                 <p className="text-xs text-surface-500 mt-2">
-                  El total se suma al saldo del cliente y se cobra más tarde desde Clientes.
+                  {accountPaidAmount > 0
+                    ? 'El saldo se actualiza con la diferencia y se cobra más tarde desde Clientes.'
+                    : 'El total se suma al saldo del cliente y se cobra más tarde desde Clientes.'}
                 </p>
               </div>
             )}

@@ -1,6 +1,9 @@
 -- KioskoGo - Cuenta corriente (ejecutar en Supabase SQL Editor)
 
--- 1. record_sale: valida cliente para cuenta corriente y suma el total al saldo del cliente
+-- 1. record_sale: valida cliente para cuenta corriente, aplica el abono del momento
+--    y ajusta el saldo del cliente
+DROP FUNCTION IF EXISTS record_sale(UUID, UUID, TEXT, NUMERIC, NUMERIC, NUMERIC, NUMERIC, JSONB);
+
 CREATE OR REPLACE FUNCTION record_sale(
   p_cash_register_id UUID,
   p_customer_id UUID,
@@ -9,7 +12,8 @@ CREATE OR REPLACE FUNCTION record_sale(
   p_discount NUMERIC,
   p_tax NUMERIC,
   p_total NUMERIC,
-  p_items JSONB
+  p_items JSONB,
+  p_amount_paid NUMERIC DEFAULT 0
 )
 RETURNS TABLE (id UUID, number INTEGER)
 LANGUAGE plpgsql
@@ -32,6 +36,10 @@ BEGIN
 
   IF p_payment_method = 'account' AND p_customer_id IS NULL THEN
     RAISE EXCEPTION 'La cuenta corriente requiere seleccionar un cliente';
+  END IF;
+
+  IF p_amount_paid IS NULL OR p_amount_paid < 0 THEN
+    RAISE EXCEPTION 'El monto abonado no puede ser negativo';
   END IF;
 
   IF p_cash_register_id IS NOT NULL THEN
@@ -62,7 +70,7 @@ BEGIN
 
   IF p_payment_method = 'account' AND p_customer_id IS NOT NULL THEN
     UPDATE customers
-    SET balance = balance + p_total
+    SET balance = balance + (p_total - p_amount_paid)
     WHERE customers.id = p_customer_id
       AND customers.business_id = v_business_id;
   END IF;
@@ -70,6 +78,11 @@ BEGIN
   IF p_payment_method = 'cash' AND p_cash_register_id IS NOT NULL THEN
     INSERT INTO cash_movements (cash_register_id, type, amount, description, sale_id, user_id)
     VALUES (p_cash_register_id, 'sale_in', p_total, 'Venta #' || v_sale_number || ' - Efectivo', v_sale_id, v_user_id);
+  END IF;
+
+  IF p_payment_method = 'account' AND p_amount_paid > 0 AND p_cash_register_id IS NOT NULL THEN
+    INSERT INTO cash_movements (cash_register_id, type, amount, description, sale_id, user_id)
+    VALUES (p_cash_register_id, 'sale_in', p_amount_paid, 'Venta #' || v_sale_number || ' - Abono cuenta corriente', v_sale_id, v_user_id);
   END IF;
 
   RETURN QUERY SELECT v_sale_id, v_sale_number;
@@ -92,7 +105,7 @@ DECLARE
   v_customer_name TEXT;
 BEGIN
   v_user_id := auth.uid();
-  SELECT business_id INTO v_business_id FROM profiles WHERE id = v_user_id;
+  SELECT business_id INTO v_business_id FROM profiles WHERE profiles.id = v_user_id;
   IF v_business_id IS NULL THEN
     RAISE EXCEPTION 'El usuario no tiene un comercio asociado';
   END IF;
@@ -103,25 +116,25 @@ BEGIN
 
   SELECT name INTO v_customer_name
   FROM customers
-  WHERE id = p_customer_id AND business_id = v_business_id;
+  WHERE customers.id = p_customer_id AND customers.business_id = v_business_id;
   IF v_customer_name IS NULL THEN
     RAISE EXCEPTION 'Cliente no encontrado';
   END IF;
 
   UPDATE customers
   SET balance = balance - p_amount
-  WHERE id = p_customer_id
-    AND business_id = v_business_id;
+  WHERE customers.id = p_customer_id
+    AND customers.business_id = v_business_id;
 
   SELECT balance INTO v_new_balance
   FROM customers
-  WHERE id = p_customer_id;
+  WHERE customers.id = p_customer_id;
 
   SELECT id INTO v_register_id
   FROM cash_registers
-  WHERE business_id = v_business_id
-    AND status = 'open'
-  ORDER BY opened_at DESC
+  WHERE cash_registers.business_id = v_business_id
+    AND cash_registers.status = 'open'
+  ORDER BY cash_registers.opened_at DESC
   LIMIT 1;
 
   IF v_register_id IS NOT NULL THEN

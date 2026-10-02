@@ -16,6 +16,7 @@ export interface RecordSaleInput {
   discount: number;
   tax: number;
   total: number;
+  amount_paid?: number;
   items: SaleItemInput[];
 }
 
@@ -25,7 +26,7 @@ export interface RecordedSale {
 }
 
 export async function recordSale(input: RecordSaleInput): Promise<RecordedSale> {
-  const { data, error } = await supabase.rpc('record_sale', {
+  const args: Record<string, unknown> = {
     p_cash_register_id: input.cash_register_id ?? null,
     p_customer_id: input.customer_id ?? null,
     p_payment_method: input.payment_method,
@@ -34,7 +35,11 @@ export async function recordSale(input: RecordSaleInput): Promise<RecordedSale> 
     p_tax: input.tax,
     p_total: input.total,
     p_items: input.items,
-  });
+  };
+  if ((input.amount_paid ?? 0) > 0) {
+    args.p_amount_paid = input.amount_paid;
+  }
+  const { data, error } = await supabase.rpc('record_sale', args);
   if (error) throw new Error(error.message);
   const rows = Array.isArray(data) ? data : [data];
   if (!rows.length || !rows[0]) throw new Error('No se pudo registrar la venta');
