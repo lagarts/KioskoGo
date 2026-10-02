@@ -51,7 +51,7 @@ interface MenuItem {
 const menuSections: { title?: string; items: MenuItem[] }[] = [
   {
     items: [
-      { label: 'Dashboard', path: '/', icon: <LayoutDashboard size={20} /> },
+      { label: 'Menu', path: '/', icon: <LayoutDashboard size={20} /> },
       { label: 'Cargar Ventas', path: '/sales/new', icon: <ShoppingCart size={20} /> },
       { label: 'Caja', path: '/cash', icon: <Wallet size={20} /> },
     ],
