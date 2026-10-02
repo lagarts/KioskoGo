@@ -17,6 +17,7 @@ import {
 import { Card } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
 import { Badge } from '../../components/ui/Badge';
+import { CalculatorModal } from '../../components/ui/CalculatorModal';
 import { formatCurrency } from '../../utils/format';
 import { listProducts, type ProductWithCategory } from '../../services/products.service';
 import { listCategories, type CategoryWithCount } from '../../services/categories.service';
@@ -55,6 +56,7 @@ export function POSPage() {
   const [search, setSearch] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('all');
   const [showPayment, setShowPayment] = useState(false);
+  const [calcMode, setCalcMode] = useState<'basic' | 'amount' | null>(null);
   const [selectedPayment, setSelectedPayment] = useState<PaymentMethod>('cash');
   const [amountPaid, setAmountPaid] = useState('');
   const [saving, setSaving] = useState(false);
@@ -63,10 +65,15 @@ export function POSPage() {
   const [lastSaleTotal, setLastSaleTotal] = useState(0);
   const searchRef = useRef<HTMLInputElement>(null);
   const productsRef = useRef<ProductWithCategory[]>([]);
+  const calcOpenRef = useRef(false);
 
   useEffect(() => {
     productsRef.current = products;
   }, [products]);
+
+  useEffect(() => {
+    calcOpenRef.current = calcMode !== null;
+  }, [calcMode]);
 
   const loadAll = async () => {
     try {
@@ -188,7 +195,7 @@ export function POSPage() {
     let timeout: ReturnType<typeof setTimeout>;
 
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (document.activeElement === searchRef.current) return;
+      if (document.activeElement === searchRef.current || calcOpenRef.current) return;
 
       if (e.key === 'Enter' && barcodeBuffer.length > 0) {
         const product = productsRef.current.find(
@@ -226,6 +233,7 @@ export function POSPage() {
       if (e.key === 'Escape') {
         setShowPayment(false);
         setSaleComplete(false);
+        setCalcMode(null);
       }
     };
     window.addEventListener('keydown', handleKeyDown);
@@ -275,14 +283,24 @@ export function POSPage() {
               <h2 className="text-lg font-semibold text-white">Carrito</h2>
               {cart.length > 0 && <Badge variant="info">{cartItems}</Badge>}
             </div>
-            {cart.length > 0 && (
+            <div className="flex items-center gap-3">
               <button
-                onClick={() => setCart([])}
-                className="text-xs text-red-400 hover:text-red-300"
+                onClick={() => setCalcMode('basic')}
+                className="flex items-center gap-1.5 text-xs text-surface-400 hover:text-kiosko-500 transition-colors"
+                title="Abrir calculadora"
               >
-                Vaciar
+                <Calculator size={15} />
+                <span className="hidden sm:inline">Calculadora</span>
               </button>
-            )}
+              {cart.length > 0 && (
+                <button
+                  onClick={() => setCart([])}
+                  className="text-xs text-red-400 hover:text-red-300"
+                >
+                  Vaciar
+                </button>
+              )}
+            </div>
           </div>
 
           <div className="flex-1 overflow-y-auto py-3 space-y-2">
@@ -513,7 +531,16 @@ export function POSPage() {
 
             {selectedPayment === 'cash' && (
               <div>
-                <label className="block text-sm text-surface-400 mb-1">Monto recibido</label>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="text-sm text-surface-400">Monto recibido</label>
+                  <button
+                    onClick={() => setCalcMode('amount')}
+                    className="flex items-center gap-1 text-xs text-surface-400 hover:text-kiosko-500 transition-colors"
+                  >
+                    <Calculator size={12} />
+                    Calculadora
+                  </button>
+                </div>
                 <input
                   type="number"
                   value={amountPaid}
@@ -549,6 +576,16 @@ export function POSPage() {
           </div>
         </div>
       )}
+
+      <CalculatorModal
+        open={calcMode !== null}
+        onClose={() => setCalcMode(null)}
+        onUse={
+          calcMode === 'amount'
+            ? (value) => setAmountPaid(value)
+            : undefined
+        }
+      />
     </div>
   );
 }
