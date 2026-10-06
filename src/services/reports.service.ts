@@ -1,4 +1,5 @@
 import { supabase } from '../lib/supabase';
+import type { PaymentMethod } from '../types';
 
 export type ReportKey = 'caja' | 'mes' | 'anio' | 'cajero' | 'ranking' | 'sucursales';
 
@@ -40,6 +41,58 @@ const MONTH_LABELS = [
   'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
   'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre',
 ];
+
+export const PAYMENT_LABELS: Record<PaymentMethod, string> = {
+  cash: 'Efectivo',
+  debit: 'Tarjeta Débito',
+  credit: 'Tarjeta Crédito',
+  transfer: 'Transferencia',
+  mercadopago: 'Mercado Pago',
+  account: 'Cuenta Corriente',
+  other: 'Otro',
+};
+
+export interface SaleDetail {
+  id: string;
+  number: number;
+  total: number;
+  created_at: string;
+  payment_method: PaymentMethod;
+  customer_name: string | null;
+  customer_balance: number | null;
+}
+
+export async function getMonthSales(monthKey: string): Promise<SaleDetail[]> {
+  const [year, month] = monthKey.split('-').map(Number);
+  const from = new Date(year, month - 1, 1).toISOString();
+  const to = new Date(year, month, 1).toISOString();
+
+  const { data, error } = await supabase
+    .from('sales')
+    .select('id, number, total, created_at, payment_method, customers(name, balance)')
+    .eq('status', 'completed')
+    .gte('created_at', from)
+    .lt('created_at', to)
+    .order('created_at', { ascending: false });
+  if (error) throw new Error(error.message);
+
+  return ((data ?? []) as unknown as {
+    id: string;
+    number: number;
+    total: string | number;
+    created_at: string;
+    payment_method: PaymentMethod;
+    customers: { name: string; balance: string | number } | null;
+  }[]).map((row) => ({
+    id: row.id,
+    number: row.number,
+    total: Number(row.total),
+    created_at: row.created_at,
+    payment_method: row.payment_method,
+    customer_name: row.customers?.name ?? null,
+    customer_balance: row.customers ? Number(row.customers.balance) : null,
+  }));
+}
 
 const REPORT_TITLES: Record<ReportKey, string> = {
   caja: 'Historial por caja',

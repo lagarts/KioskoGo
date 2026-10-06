@@ -8,12 +8,21 @@ import {
   Trophy,
   Building2,
   ArrowLeft,
+  Eye,
 } from 'lucide-react';
 import { Card } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
 import { useAuth } from '../../contexts/AuthContext';
-import { getReport, type ReportKey, type ReportResult } from '../../services/reports.service';
-import { formatCurrency } from '../../utils/format';
+import {
+  getReport,
+  getMonthSales,
+  PAYMENT_LABELS,
+  type ReportKey,
+  type ReportResult,
+  type ReportRow,
+  type SaleDetail,
+} from '../../services/reports.service';
+import { formatCurrency, formatDateTime } from '../../utils/format';
 
 const reportOptions: {
   key: ReportKey;
@@ -35,6 +44,10 @@ export function ReportsPage() {
   const [result, setResult] = useState<ReportResult | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [drill, setDrill] = useState<{ key: string; label: string } | null>(null);
+  const [detail, setDetail] = useState<SaleDetail[]>([]);
+  const [detailLoading, setDetailLoading] = useState(false);
+  const [detailError, setDetailError] = useState('');
 
   const openReport = async (key: ReportKey) => {
     if (!user) return;
@@ -42,6 +55,8 @@ export function ReportsPage() {
     setLoading(true);
     setError('');
     setResult(null);
+    setDrill(null);
+    setDetail([]);
     try {
       setResult(await getReport(key, user.business_id));
     } catch (err) {
@@ -51,7 +66,31 @@ export function ReportsPage() {
     }
   };
 
+  const openDrill = async (row: ReportRow) => {
+    setDrill({ key: row.key, label: row.label });
+    setDetailLoading(true);
+    setDetailError('');
+    setDetail([]);
+    try {
+      setDetail(await getMonthSales(row.key));
+    } catch (err) {
+      setDetailError(err instanceof Error ? err.message : 'No se pudo cargar el detalle');
+    } finally {
+      setDetailLoading(false);
+    }
+  };
+
+  const closeDrill = () => {
+    setDrill(null);
+    setDetail([]);
+    setDetailError('');
+  };
+
   const back = () => {
+    if (drill) {
+      closeDrill();
+      return;
+    }
     setActive(null);
     setResult(null);
     setError('');
@@ -99,8 +138,12 @@ export function ReportsPage() {
             {option?.icon ?? <BarChart3 size={20} className="text-kiosko-500" />}
           </div>
           <div>
-            <h1 className="text-2xl font-bold text-white">{result?.title ?? option?.label}</h1>
-            <p className="text-sm text-surface-400">Reporte de ventas</p>
+            <h1 className="text-2xl font-bold text-white">
+              {drill ? drill.label : (result?.title ?? option?.label)}
+            </h1>
+            <p className="text-sm text-surface-400">
+              {drill ? 'Detalle de ventas del mes' : 'Reporte de ventas'}
+            </p>
           </div>
         </div>
         <Button variant="secondary" size="sm" onClick={back}>
@@ -121,7 +164,100 @@ export function ReportsPage() {
         </Card>
       )}
 
-      {!loading && result && (
+      {!loading && drill && (
+        <>
+          {detailLoading && (
+            <Card>
+              <p className="text-sm text-surface-400 text-center py-10">Cargando detalle...</p>
+            </Card>
+          )}
+
+          {!detailLoading && detailError && (
+            <div className="rounded-lg border border-red-800 bg-red-900/40 px-4 py-3 text-sm text-red-400">
+              {detailError}
+            </div>
+          )}
+
+          {!detailLoading && !detailError && (
+            <>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <Card>
+                  <p className="text-sm text-surface-400">Ventas</p>
+                  <p className="text-2xl font-bold text-white mt-1">{detail.length}</p>
+                </Card>
+                <Card>
+                  <p className="text-sm text-surface-400">Total</p>
+                  <p className="text-2xl font-bold text-kiosko-500 mt-1">
+                    {formatCurrency(detail.reduce((sum, s) => sum + s.total, 0))}
+                  </p>
+                </Card>
+              </div>
+
+              <Card>
+                {detail.length === 0 ? (
+                  <p className="text-sm text-surface-500 text-center py-10">
+                    Sin ventas en este mes
+                  </p>
+                ) : (
+                  <div className="space-y-2">
+                    {detail.map((sale) => (
+                      <div
+                        key={sale.id}
+                        className="flex flex-wrap items-center justify-between gap-3 p-3 bg-surface-800/40 rounded-lg border border-surface-800/60"
+                      >
+                        <div className="min-w-0">
+                          <p className="text-sm font-medium text-white">Venta #{sale.number}</p>
+                          <p className="text-xs text-surface-500">
+                            {formatDateTime(sale.created_at)}
+                          </p>
+                        </div>
+
+                        {sale.customer_name ? (
+                          <div className="bg-surface-800 border border-surface-700 rounded-lg px-3 py-2 min-w-0 max-w-[200px]">
+                            <p className="text-sm text-white truncate">{sale.customer_name}</p>
+                            <p className="text-xs text-surface-400">
+                              Saldo actual:{' '}
+                              <span
+                                className={
+                                  (sale.customer_balance ?? 0) > 0
+                                    ? 'text-red-400'
+                                    : (sale.customer_balance ?? 0) < 0
+                                      ? 'text-green-400'
+                                      : 'text-surface-400'
+                                }
+                              >
+                                {formatCurrency(sale.customer_balance ?? 0)}
+                              </span>
+                            </p>
+                          </div>
+                        ) : (
+                          <span className="text-xs text-surface-600">Sin cliente</span>
+                        )}
+
+                        <span
+                          className={`inline-flex px-3 py-1.5 rounded-lg border text-xs font-medium whitespace-nowrap ${
+                            sale.payment_method === 'account'
+                              ? 'border-kiosko-600 bg-kiosko-600/10 text-kiosko-500'
+                              : 'border-surface-700 bg-surface-800 text-surface-300'
+                          }`}
+                        >
+                          {PAYMENT_LABELS[sale.payment_method] ?? sale.payment_method}
+                        </span>
+
+                        <p className="text-sm font-semibold text-kiosko-500 ml-auto">
+                          {formatCurrency(sale.total)}
+                        </p>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </Card>
+            </>
+          )}
+        </>
+      )}
+
+      {!loading && !drill && result && (
         <>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <Card>
@@ -164,6 +300,11 @@ export function ReportsPage() {
                       </th>
                       <th className="text-right px-4 py-3 text-xs font-semibold text-surface-400 uppercase">Total</th>
                       <th className="text-right px-4 py-3 text-xs font-semibold text-surface-400 uppercase hidden sm:table-cell">% del total</th>
+                      {active === 'mes' && (
+                        <th className="text-right px-4 py-3 text-xs font-semibold text-surface-400 uppercase">
+                          Ver
+                        </th>
+                      )}
                     </tr>
                   </thead>
                   <tbody>
@@ -185,6 +326,17 @@ export function ReportsPage() {
                           <td className="px-4 py-3 text-right text-surface-400 hidden sm:table-cell">
                             {pct}%
                           </td>
+                          {active === 'mes' && (
+                            <td className="px-4 py-3 text-right">
+                              <button
+                                onClick={() => void openDrill(row)}
+                                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-surface-700 bg-surface-800 text-xs text-surface-300 hover:border-kiosko-600 hover:text-kiosko-500 transition-colors"
+                              >
+                                <Eye size={13} />
+                                Ver
+                              </button>
+                            </td>
+                          )}
                         </tr>
                       );
                     })}
