@@ -9,6 +9,7 @@ export interface ReportRow {
   sublabel?: string;
   count: number;
   total: number;
+  cost?: number;
 }
 
 export interface ReportResult {
@@ -35,6 +36,32 @@ interface ItemRow {
   quantity: string | number;
   total: string | number;
   products?: { name: string } | null;
+}
+
+function monthKeyOf(dateIso: string): string {
+  const d = new Date(dateIso);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+}
+
+export async function getCostsByMonth(businessId: string): Promise<Map<string, number>> {
+  const { data, error } = await supabase
+    .from('sale_items')
+    .select('quantity, products(cost), sales!inner(created_at, status, business_id)')
+    .eq('sales.status', 'completed')
+    .eq('sales.business_id', businessId);
+  if (error) throw new Error(error.message);
+
+  const map = new Map<string, number>();
+  for (const item of (data ?? []) as unknown as {
+    quantity: string | number;
+    products: { cost: string | number } | null;
+    sales: { created_at: string };
+  }[]) {
+    const key = monthKeyOf(item.sales.created_at);
+    const cost = Number(item.quantity) * Number(item.products?.cost ?? 0);
+    map.set(key, (map.get(key) ?? 0) + cost);
+  }
+  return map;
 }
 
 const MONTH_LABELS = [
@@ -176,13 +203,18 @@ export async function getReport(key: ReportKey, businessId: string): Promise<Rep
         sublabel: row.branches?.name ?? undefined,
       })).sort((a, b) => b.total - a.total);
       break;
-    case 'mes':
+    case 'mes': {
       rows = aggregate(sales, (row) => {
         const d = new Date(row.created_at);
         const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
         return { key, label: `${MONTH_LABELS[d.getMonth()]} ${d.getFullYear()}` };
       }).sort((a, b) => b.key.localeCompare(a.key));
+      const costs = await getCostsByMonth(businessId);
+      for (const row of rows) {
+        row.cost = costs.get(row.key) ?? 0;
+      }
       break;
+    }
     case 'anio':
       rows = aggregate(sales, (row) => {
         const key = String(new Date(row.created_at).getFullYear());

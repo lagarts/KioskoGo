@@ -16,6 +16,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import {
   getReport,
   getMonthSales,
+  getCostsByMonth,
   PAYMENT_LABELS,
   type ReportKey,
   type ReportResult,
@@ -48,6 +49,7 @@ export function ReportsPage() {
   const [detail, setDetail] = useState<SaleDetail[]>([]);
   const [detailLoading, setDetailLoading] = useState(false);
   const [detailError, setDetailError] = useState('');
+  const [drillCost, setDrillCost] = useState(0);
 
   const openReport = async (key: ReportKey) => {
     if (!user) return;
@@ -67,12 +69,19 @@ export function ReportsPage() {
   };
 
   const openDrill = async (row: ReportRow) => {
+    if (!user) return;
     setDrill({ key: row.key, label: row.label });
     setDetailLoading(true);
     setDetailError('');
     setDetail([]);
+    setDrillCost(0);
     try {
-      setDetail(await getMonthSales(row.key));
+      const [salesDetail, costs] = await Promise.all([
+        getMonthSales(row.key),
+        getCostsByMonth(user.business_id),
+      ]);
+      setDetail(salesDetail);
+      setDrillCost(costs.get(row.key) ?? 0);
     } catch (err) {
       setDetailError(err instanceof Error ? err.message : 'No se pudo cargar el detalle');
     } finally {
@@ -84,6 +93,7 @@ export function ReportsPage() {
     setDrill(null);
     setDetail([]);
     setDetailError('');
+    setDrillCost(0);
   };
 
   const back = () => {
@@ -180,18 +190,45 @@ export function ReportsPage() {
 
           {!detailLoading && !detailError && (
             <>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <Card>
-                  <p className="text-sm text-surface-400">Ventas</p>
-                  <p className="text-2xl font-bold text-white mt-1">{detail.length}</p>
-                </Card>
-                <Card>
-                  <p className="text-sm text-surface-400">Total</p>
-                  <p className="text-2xl font-bold text-kiosko-500 mt-1">
-                    {formatCurrency(detail.reduce((sum, s) => sum + s.total, 0))}
-                  </p>
-                </Card>
-              </div>
+              {(() => {
+                const detailTotal = detail.reduce((sum, s) => sum + s.total, 0);
+                const detailProfit = detailTotal - drillCost;
+                const detailMargin =
+                  detailTotal > 0 ? Math.round((detailProfit / detailTotal) * 100) : 0;
+                return (
+                  <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+                    <Card>
+                      <p className="text-sm text-surface-400">Ventas</p>
+                      <p className="text-2xl font-bold text-white mt-1">{detail.length}</p>
+                    </Card>
+                    <Card>
+                      <p className="text-sm text-surface-400">Total</p>
+                      <p className="text-2xl font-bold text-kiosko-500 mt-1">
+                        {formatCurrency(detailTotal)}
+                      </p>
+                    </Card>
+                    <Card>
+                      <p className="text-sm text-surface-400">Costos</p>
+                      <p className="text-2xl font-bold text-white mt-1">
+                        {formatCurrency(drillCost)}
+                      </p>
+                    </Card>
+                    <Card>
+                      <p className="text-sm text-surface-400">Beneficio</p>
+                      <p
+                        className={`text-2xl font-bold mt-1 ${
+                          detailProfit >= 0 ? 'text-green-400' : 'text-red-400'
+                        }`}
+                      >
+                        {formatCurrency(detailProfit)}
+                      </p>
+                      <p className="text-xs text-surface-500 mt-1">
+                        Rentabilidad: {detailMargin}%
+                      </p>
+                    </Card>
+                  </div>
+                );
+              })()}
 
               <Card>
                 {detail.length === 0 ? (
@@ -298,7 +335,22 @@ export function ReportsPage() {
                       <th className="text-right px-4 py-3 text-xs font-semibold text-surface-400 uppercase">
                         {active === 'ranking' ? 'Unidades' : 'Ventas'}
                       </th>
+                      {active === 'mes' && (
+                        <>
+                          <th className="text-right px-4 py-3 text-xs font-semibold text-surface-400 uppercase hidden md:table-cell">
+                            Costos
+                          </th>
+                          <th className="text-right px-4 py-3 text-xs font-semibold text-surface-400 uppercase hidden md:table-cell">
+                            Beneficio
+                          </th>
+                        </>
+                      )}
                       <th className="text-right px-4 py-3 text-xs font-semibold text-surface-400 uppercase">Total</th>
+                      {active === 'mes' && (
+                        <th className="text-right px-4 py-3 text-xs font-semibold text-surface-400 uppercase hidden md:table-cell">
+                          Rentabilidad
+                        </th>
+                      )}
                       <th className="text-right px-4 py-3 text-xs font-semibold text-surface-400 uppercase hidden sm:table-cell">% del total</th>
                       {active === 'mes' && (
                         <th className="text-right px-4 py-3 text-xs font-semibold text-surface-400 uppercase">
@@ -313,6 +365,10 @@ export function ReportsPage() {
                         result.grandTotal > 0
                           ? Math.round((row.total / result.grandTotal) * 100)
                           : 0;
+                      const rowCost = row.cost ?? 0;
+                      const rowProfit = row.total - rowCost;
+                      const rowMargin =
+                        row.total > 0 ? Math.round((rowProfit / row.total) * 100) : 0;
                       return (
                         <tr key={row.key} className="border-b border-surface-800/50 hover:bg-surface-800/30">
                           <td className="px-4 py-3">
@@ -320,9 +376,28 @@ export function ReportsPage() {
                             {row.sublabel && <p className="text-xs text-surface-500">{row.sublabel}</p>}
                           </td>
                           <td className="px-4 py-3 text-right text-surface-300">{row.count}</td>
+                          {active === 'mes' && (
+                            <>
+                              <td className="px-4 py-3 text-right text-surface-300 hidden md:table-cell">
+                                {formatCurrency(rowCost)}
+                              </td>
+                              <td
+                                className={`px-4 py-3 text-right font-semibold hidden md:table-cell ${
+                                  rowProfit >= 0 ? 'text-green-400' : 'text-red-400'
+                                }`}
+                              >
+                                {formatCurrency(rowProfit)}
+                              </td>
+                            </>
+                          )}
                           <td className="px-4 py-3 text-right font-semibold text-kiosko-500">
                             {formatCurrency(row.total)}
                           </td>
+                          {active === 'mes' && (
+                            <td className="px-4 py-3 text-right text-surface-300 hidden md:table-cell">
+                              {rowMargin}%
+                            </td>
+                          )}
                           <td className="px-4 py-3 text-right text-surface-400 hidden sm:table-cell">
                             {pct}%
                           </td>
