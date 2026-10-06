@@ -1,6 +1,7 @@
 import { createContext, useContext, useEffect, useRef, useState, type ReactNode } from 'react';
 import type { User } from '../types';
 import { supabase } from '../lib/supabase';
+import { toAuthEmail } from '../lib/username';
 import type { User as SupabaseUser } from '@supabase/supabase-js';
 
 interface AuthContextType {
@@ -86,7 +87,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const signIn = async (email: string, password: string) => {
-    const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+    const { data, error } = await supabase.auth.signInWithPassword({
+      email: toAuthEmail(email),
+      password,
+    });
     if (error) throw error;
     if (data.user) {
       const profile = await loadProfile(data.user);

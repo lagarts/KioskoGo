@@ -6,6 +6,7 @@ import { Badge } from '../../components/ui/Badge';
 import { Input } from '../../components/ui/Input';
 import { useAuth } from '../../contexts/AuthContext';
 import { createCashier, listCashiers, removeCashier } from '../../services/cashiers.service';
+import { isValidUsername, displayUserEmail } from '../../lib/username';
 import type { User } from '../../types';
 import { formatDate } from '../../utils/format';
 
@@ -17,7 +18,7 @@ export function CashiersPage() {
   const [message, setMessage] = useState('');
   const [showForm, setShowForm] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [formData, setFormData] = useState({ name: '', email: '', password: '' });
+  const [formData, setFormData] = useState({ name: '', username: '', password: '' });
 
   const load = useCallback(async () => {
     if (!user) return;
@@ -39,14 +40,19 @@ export function CashiersPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (saving) return;
+    const username = formData.username.trim().toLowerCase();
+    if (!isValidUsername(username)) {
+      setError('Usuario inválido: 3 a 20 caracteres (letras, números, . o _), sin espacios ni @');
+      return;
+    }
     setSaving(true);
     setError(null);
     setMessage('');
     try {
-      await createCashier(formData.email, formData.name, formData.password);
+      await createCashier(username, formData.name, formData.password);
       setShowForm(false);
-      setFormData({ name: '', email: '', password: '' });
-      setMessage('Cuenta de cajero creada. Ya puede ingresar con su email y contraseña.');
+      setFormData({ name: '', username: '', password: '' });
+      setMessage(`Cuenta de ${username} creada. Ya puede ingresar con su usuario y contraseña.`);
       await load();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Error al crear el cajero');
@@ -96,7 +102,7 @@ export function CashiersPage() {
         </div>
         <Button
           onClick={() => {
-            setFormData({ name: '', email: '', password: '' });
+            setFormData({ name: '', username: '', password: '' });
             setError(null);
             setShowForm(true);
           }}
@@ -131,7 +137,7 @@ export function CashiersPage() {
               <thead>
                 <tr className="border-b border-surface-800">
                   <th className="text-left px-4 py-3 text-xs font-semibold text-surface-400 uppercase">Nombre</th>
-                  <th className="text-left px-4 py-3 text-xs font-semibold text-surface-400 uppercase">Email</th>
+                  <th className="text-left px-4 py-3 text-xs font-semibold text-surface-400 uppercase">Usuario</th>
                   <th className="text-left px-4 py-3 text-xs font-semibold text-surface-400 uppercase hidden md:table-cell">Alta</th>
                   <th className="text-center px-4 py-3 text-xs font-semibold text-surface-400 uppercase">Rol</th>
                   <th className="text-right px-4 py-3 text-xs font-semibold text-surface-400 uppercase">Acciones</th>
@@ -141,7 +147,7 @@ export function CashiersPage() {
                 {cashiers.map((cashier) => (
                   <tr key={cashier.id} className="border-b border-surface-800/50 hover:bg-surface-800/30">
                     <td className="px-4 py-3 font-medium text-white">{cashier.name}</td>
-                    <td className="px-4 py-3 text-surface-300">{cashier.email}</td>
+                    <td className="px-4 py-3 text-surface-300">{displayUserEmail(cashier.email)}</td>
                     <td className="px-4 py-3 text-surface-300 hidden md:table-cell">
                       {formatDate(cashier.created_at)}
                     </td>
@@ -198,13 +204,15 @@ export function CashiersPage() {
                 required
               />
               <Input
-                label="Email *"
-                type="email"
-                value={formData.email}
-                onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                placeholder="cajero@email.com"
+                label="Usuario *"
+                type="text"
+                value={formData.username}
+                onChange={(e) => setFormData({ ...formData, username: e.target.value })}
+                placeholder="ej: juan123"
                 icon={<Mail size={16} />}
+                autoComplete="off"
                 required
+                maxLength={20}
               />
               <Input
                 label="Contraseña *"
@@ -217,7 +225,7 @@ export function CashiersPage() {
                 minLength={6}
               />
               <p className="text-xs text-surface-500">
-                El cajero ingresa con estos datos. Podés eliminar la cuenta desde esta pantalla.
+                El cajero ingresa con su usuario y contraseña (sin @). Podés eliminar la cuenta desde esta pantalla.
               </p>
               <div className="flex gap-3 pt-2">
                 <Button type="button" variant="secondary" fullWidth onClick={() => setShowForm(false)}>

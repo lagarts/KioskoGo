@@ -21,7 +21,7 @@ export function Login() {
   const navigate = useNavigate();
 
   const friendlyError = (message: string) => {
-    if (message.includes('Invalid login credentials')) return 'Email o contraseña incorrectos';
+    if (message.includes('Invalid login credentials')) return 'Usuario o contraseña incorrectos';
     if (message.includes('Email not confirmed')) return 'Confirmá tu email antes de ingresar';
     if (message.includes('User already registered')) return 'Ese email ya está registrado';
     if (message.includes('Password should be')) return 'La contraseña debe tener al menos 6 caracteres';
@@ -102,9 +102,10 @@ export function Login() {
             )}
 
             <Input
-              label="Email"
-              type="email"
-              placeholder="tu@email.com"
+              label={mode === 'login' ? 'Email o usuario' : 'Email'}
+              type={mode === 'login' ? 'text' : 'email'}
+              placeholder={mode === 'login' ? 'usuario o tu@email.com' : 'tu@email.com'}
+              autoComplete="username"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               icon={<Mail size={16} />}

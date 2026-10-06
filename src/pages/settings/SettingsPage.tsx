@@ -33,6 +33,7 @@ import {
 } from '../../services/business.service';
 import { formatDate } from '../../utils/format';
 import { createCashier } from '../../services/cashiers.service';
+import { isValidUsername, displayUserEmail } from '../../lib/username';
 import type { RubroType, Subscription, User, UserRole } from '../../types';
 
 type SettingsSection =
@@ -464,7 +465,7 @@ function UsersSection() {
   const [showForm, setShowForm] = useState(false);
   const [saving, setSaving] = useState(false);
   const [formError, setFormError] = useState('');
-  const [formData, setFormData] = useState({ name: '', email: '', password: '' });
+  const [formData, setFormData] = useState({ name: '', username: '', password: '' });
 
   const load = useCallback(async () => {
     if (!user?.business_id) return;
@@ -486,13 +487,18 @@ function UsersSection() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (saving) return;
+    const username = formData.username.trim().toLowerCase();
+    if (!isValidUsername(username)) {
+      setFormError('Usuario inválido: 3 a 20 caracteres (letras, números, . o _), sin espacios ni @');
+      return;
+    }
     setSaving(true);
     setFormError('');
     try {
-      await createCashier(formData.email, formData.name, formData.password);
+      await createCashier(username, formData.name, formData.password);
       setShowForm(false);
-      setFormData({ name: '', email: '', password: '' });
-      setMessage(`Cuenta de ${formData.name || 'cajero'} creada. Ya puede ingresar con su email y contraseña.`);
+      setFormData({ name: '', username: '', password: '' });
+      setMessage(`Cuenta de ${username} creada. Ya puede ingresar con su usuario y contraseña.`);
       await load();
     } catch (err) {
       setFormError(err instanceof Error ? err.message : 'Error al crear el usuario');
@@ -508,7 +514,7 @@ function UsersSection() {
         <Button
           size="sm"
           onClick={() => {
-            setFormData({ name: '', email: '', password: '' });
+            setFormData({ name: '', username: '', password: '' });
             setFormError('');
             setShowForm(true);
           }}
@@ -534,7 +540,7 @@ function UsersSection() {
             <thead>
               <tr className="border-b border-surface-800">
                 <th className="text-left px-4 py-3 text-xs font-semibold text-surface-400 uppercase">Nombre</th>
-                <th className="text-left px-4 py-3 text-xs font-semibold text-surface-400 uppercase">Email</th>
+                <th className="text-left px-4 py-3 text-xs font-semibold text-surface-400 uppercase">Usuario</th>
                 <th className="text-left px-4 py-3 text-xs font-semibold text-surface-400 uppercase">Rol</th>
                 <th className="text-center px-4 py-3 text-xs font-semibold text-surface-400 uppercase">Estado</th>
               </tr>
@@ -550,7 +556,7 @@ function UsersSection() {
                 users.map((u) => (
                   <tr key={u.id} className="border-b border-surface-800/50">
                     <td className="px-4 py-3 font-medium text-white">{u.name}</td>
-                    <td className="px-4 py-3 text-surface-300">{u.email}</td>
+                    <td className="px-4 py-3 text-surface-300">{displayUserEmail(u.email)}</td>
                     <td className="px-4 py-3"><Badge>{roleLabels[u.role]}</Badge></td>
                     <td className="px-4 py-3 text-center"><Badge variant="success">Activo</Badge></td>
                   </tr>
@@ -580,13 +586,15 @@ function UsersSection() {
                 required
               />
               <Input
-                label="Email *"
-                type="email"
-                value={formData.email}
-                onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                placeholder="cajero@email.com"
+                label="Usuario *"
+                type="text"
+                value={formData.username}
+                onChange={(e) => setFormData({ ...formData, username: e.target.value })}
+                placeholder="ej: juan123"
                 icon={<Mail size={16} />}
+                autoComplete="off"
                 required
+                maxLength={20}
               />
               <Input
                 label="Contraseña *"
@@ -599,7 +607,7 @@ function UsersSection() {
                 minLength={6}
               />
               <p className="text-xs text-surface-500">
-                Se crea una cuenta de <strong className="text-surface-300">cajero</strong>: solo ve Caja y Cargar Ventas.
+                Se crea una cuenta de <strong className="text-surface-300">cajero</strong>: ingresa con su usuario y contraseña (sin @). Solo ve Caja y Cargar Ventas.
               </p>
               {formError && (
                 <div className="bg-red-900/30 border border-red-800 text-red-400 text-xs px-3 py-2 rounded-lg">

@@ -1,13 +1,18 @@
 import { supabase } from '../lib/supabase';
+import { toAuthEmail } from '../lib/username';
 import type { User } from '../types';
 
-export async function createCashier(email: string, name: string, password: string): Promise<void> {
+export async function createCashier(identifier: string, name: string, password: string): Promise<void> {
   const { error } = await supabase.rpc('admin_create_cashier', {
-    p_email: email,
+    p_email: toAuthEmail(identifier),
     p_name: name,
     p_password: password,
   });
-  if (error) throw new Error(error.message);
+  if (error) {
+    throw new Error(
+      error.message.includes('ya está registrado') ? 'Ese usuario ya existe' : error.message
+    );
+  }
 }
 
 export async function listCashiers(businessId: string): Promise<User[]> {
