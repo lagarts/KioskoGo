@@ -90,7 +90,7 @@ export function CashiersPage() {
           <div>
             <h1 className="text-2xl font-bold text-white">Cajeros</h1>
             <p className="text-sm text-surface-400">
-              Cuentas con acceso limitado: Caja, Cargar Venta y Código de Barras
+              Cuentas con acceso limitado: Caja y Cargar Ventas
             </p>
           </div>
         </div>
@@ -173,7 +173,6 @@ export function CashiersPage() {
         <ul className="text-sm text-surface-400 space-y-1">
           <li>✓ Caja — abrir, cerrar y ver movimientos</li>
           <li>✓ Cargar Ventas — punto de venta</li>
-          <li>✓ Código de Barras</li>
         </ul>
         <p className="text-xs text-surface-500 mt-2">
           El cajero no ve productos, reportes, configuración ni el resto del menú.

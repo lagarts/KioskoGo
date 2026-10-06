@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import {
   Settings,
   Store,
@@ -15,6 +15,9 @@ import {
   Smartphone,
   Lock,
   HardDrive,
+  X,
+  KeyRound,
+  Mail,
 } from 'lucide-react';
 import { Card } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
@@ -29,6 +32,7 @@ import {
   type BusinessInput,
 } from '../../services/business.service';
 import { formatDate } from '../../utils/format';
+import { createCashier } from '../../services/cashiers.service';
 import type { RubroType, Subscription, User, UserRole } from '../../types';
 
 type SettingsSection =
@@ -456,32 +460,70 @@ function UsersSection() {
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [message, setMessage] = useState('');
+  const [showForm, setShowForm] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [formError, setFormError] = useState('');
+  const [formData, setFormData] = useState({ name: '', email: '', password: '' });
+
+  const load = useCallback(async () => {
+    if (!user?.business_id) return;
+    try {
+      const list = await listBusinessUsers(user.business_id);
+      setUsers(list);
+      setError('');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Error cargando usuarios');
+    } finally {
+      setLoading(false);
+    }
+  }, [user?.business_id]);
 
   useEffect(() => {
-    if (!user?.business_id) return;
-    (async () => {
-      try {
-        const list = await listBusinessUsers(user.business_id);
-        setUsers(list);
-      } catch (err) {
-        setError(err instanceof Error ? err.message : 'Error cargando usuarios');
-      } finally {
-        setLoading(false);
-      }
-    })();
-  }, [user?.business_id]);
+    void load();
+  }, [load]);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (saving) return;
+    setSaving(true);
+    setFormError('');
+    try {
+      await createCashier(formData.email, formData.name, formData.password);
+      setShowForm(false);
+      setFormData({ name: '', email: '', password: '' });
+      setMessage(`Cuenta de ${formData.name || 'cajero'} creada. Ya puede ingresar con su email y contraseña.`);
+      await load();
+    } catch (err) {
+      setFormError(err instanceof Error ? err.message : 'Error al crear el usuario');
+    } finally {
+      setSaving(false);
+    }
+  };
 
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <h2 className="text-xl font-bold text-white">Usuarios</h2>
-        <Button size="sm" disabled title="Próximamente">
+        <Button
+          size="sm"
+          onClick={() => {
+            setFormData({ name: '', email: '', password: '' });
+            setFormError('');
+            setShowForm(true);
+          }}
+        >
           <Users size={14} /> Nuevo usuario
         </Button>
       </div>
       {error && (
         <div className="bg-red-900/30 border border-red-800 text-red-400 text-sm px-4 py-3 rounded-lg">
           {error}
+        </div>
+      )}
+      {message && (
+        <div className="bg-green-900/30 border border-green-800 text-green-400 text-sm px-4 py-3 rounded-lg">
+          {message}
         </div>
       )}
       {loading ? (
@@ -517,6 +559,64 @@ function UsersSection() {
             </tbody>
           </table>
         </Card>
+      )}
+
+      {showForm && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/70" onClick={() => setShowForm(false)} />
+          <div className="relative bg-surface-900 border border-surface-700 rounded-2xl w-full max-w-md p-6">
+            <div className="flex items-center justify-between mb-6">
+              <h2 className="text-xl font-bold text-white">Nuevo usuario</h2>
+              <button onClick={() => setShowForm(false)} className="text-surface-400 hover:text-white">
+                <X size={20} />
+              </button>
+            </div>
+            <form onSubmit={handleSubmit} className="space-y-4">
+              <Input
+                label="Nombre *"
+                value={formData.name}
+                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                placeholder="Nombre del cajero"
+                required
+              />
+              <Input
+                label="Email *"
+                type="email"
+                value={formData.email}
+                onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                placeholder="cajero@email.com"
+                icon={<Mail size={16} />}
+                required
+              />
+              <Input
+                label="Contraseña *"
+                type="password"
+                value={formData.password}
+                onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+                placeholder="••••••••"
+                icon={<KeyRound size={16} />}
+                required
+                minLength={6}
+              />
+              <p className="text-xs text-surface-500">
+                Se crea una cuenta de <strong className="text-surface-300">cajero</strong>: solo ve Caja y Cargar Ventas.
+              </p>
+              {formError && (
+                <div className="bg-red-900/30 border border-red-800 text-red-400 text-xs px-3 py-2 rounded-lg">
+                  {formError}
+                </div>
+              )}
+              <div className="flex gap-3 pt-2">
+                <Button type="button" variant="secondary" fullWidth onClick={() => setShowForm(false)}>
+                  Cancelar
+                </Button>
+                <Button type="submit" fullWidth disabled={saving}>
+                  {saving ? 'Creando...' : 'Crear usuario'}
+                </Button>
+              </div>
+            </form>
+          </div>
+        </div>
       )}
     </div>
   );
