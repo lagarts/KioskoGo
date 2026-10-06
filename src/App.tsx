@@ -16,6 +16,7 @@ import { AdminPage } from './pages/admin/AdminPage';
 import { BranchesPage } from './pages/branches/BranchesPage';
 import { CashiersPage } from './pages/cashiers/CashiersPage';
 import { PaymentMethodsPage } from './pages/payment-methods/PaymentMethodsPage';
+import { SupportPage } from './pages/support/SupportPage';
 import { PlaceholderPage } from './pages/PlaceholderPage';
 import {
   Warehouse,
@@ -23,7 +24,6 @@ import {
   Barcode,
   Ticket,
   FileText,
-  HelpCircle,
   Receipt,
   ShoppingCart as PurchaseIcon,
 } from 'lucide-react';
@@ -240,9 +240,7 @@ function App() {
         path="/support"
         element={
           <ProtectedRoute>
-            <MainLayout>
-              <PlaceholderPage title="Soporte" description="Centro de ayuda y soporte técnico" icon={<HelpCircle size={20} />} />
-            </MainLayout>
+            <MainLayout><SupportPage /></MainLayout>
           </ProtectedRoute>
         }
       />
