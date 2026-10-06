@@ -12,7 +12,6 @@ import {
   Warehouse,
   ArrowLeftRight,
   Barcode,
-  Ticket,
   BarChart3,
   CreditCard,
   FileText,
@@ -79,7 +78,6 @@ const menuSections: { title?: string; items: MenuItem[] }[] = [
     title: 'Herramientas',
     items: [
       { label: 'Cód. Barras', path: '/barcode', icon: <Barcode size={20} /> },
-      { label: 'Etiquetas', path: '/labels', icon: <Ticket size={20} /> },
       { label: 'Reportes', path: '/reports', icon: <BarChart3 size={20} /> },
       { label: 'Mét. Pago', path: '/payment-methods', icon: <CreditCard size={20} />, roles: ['admin'] },
       { label: 'Ctas. Corrientes', path: '/accounts', icon: <FileText size={20} /> },
