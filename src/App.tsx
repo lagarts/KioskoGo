@@ -15,13 +15,13 @@ import { ExpensesPage } from './pages/expenses/ExpensesPage';
 import { AdminPage } from './pages/admin/AdminPage';
 import { BranchesPage } from './pages/branches/BranchesPage';
 import { CashiersPage } from './pages/cashiers/CashiersPage';
+import { PaymentMethodsPage } from './pages/payment-methods/PaymentMethodsPage';
 import { PlaceholderPage } from './pages/PlaceholderPage';
 import {
   Warehouse,
   ArrowLeftRight,
   Barcode,
   Ticket,
-  CreditCard,
   FileText,
   HelpCircle,
   Receipt,
@@ -175,9 +175,7 @@ function App() {
         path="/payment-methods"
         element={
           <ProtectedRoute>
-            <MainLayout>
-              <PlaceholderPage title="Métodos de Pago" description="Configura los métodos de pago aceptados" icon={<CreditCard size={20} />} />
-            </MainLayout>
+            <MainLayout><PaymentMethodsPage /></MainLayout>
           </ProtectedRoute>
         }
       />

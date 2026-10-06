@@ -1,5 +1,4 @@
 import { supabase } from '../lib/supabase';
-import type { PaymentMethod } from '../types';
 
 export type ReportKey = 'caja' | 'mes' | 'anio' | 'cajero' | 'ranking' | 'sucursales';
 
@@ -69,7 +68,7 @@ const MONTH_LABELS = [
   'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre',
 ];
 
-export const PAYMENT_LABELS: Record<PaymentMethod, string> = {
+export const PAYMENT_LABELS: Record<string, string> = {
   cash: 'Efectivo',
   debit: 'Tarjeta Débito',
   credit: 'Tarjeta Crédito',
@@ -84,12 +83,13 @@ export interface SaleDetail {
   number: number;
   total: number;
   created_at: string;
-  payment_method: PaymentMethod;
+  payment_method: string;
+  payment_method_label: string;
   customer_name: string | null;
   customer_balance: number | null;
 }
 
-export async function getMonthSales(monthKey: string): Promise<SaleDetail[]> {
+export async function getMonthSales(monthKey: string, businessId: string): Promise<SaleDetail[]> {
   const [year, month] = monthKey.split('-').map(Number);
   const from = new Date(year, month - 1, 1).toISOString();
   const to = new Date(year, month, 1).toISOString();
@@ -103,12 +103,21 @@ export async function getMonthSales(monthKey: string): Promise<SaleDetail[]> {
     .order('created_at', { ascending: false });
   if (error) throw new Error(error.message);
 
+  const methodsRes = await supabase
+    .from('payment_methods')
+    .select('code, label')
+    .eq('business_id', businessId);
+  if (methodsRes.error) throw new Error(methodsRes.error.message);
+  const methodLabels = new Map<string, string>(
+    ((methodsRes.data ?? []) as { code: string; label: string }[]).map((m) => [m.code, m.label])
+  );
+
   return ((data ?? []) as unknown as {
     id: string;
     number: number;
     total: string | number;
     created_at: string;
-    payment_method: PaymentMethod;
+    payment_method: string;
     customers: { name: string; balance: string | number } | null;
   }[]).map((row) => ({
     id: row.id,
@@ -116,6 +125,10 @@ export async function getMonthSales(monthKey: string): Promise<SaleDetail[]> {
     total: Number(row.total),
     created_at: row.created_at,
     payment_method: row.payment_method,
+    payment_method_label:
+      methodLabels.get(row.payment_method) ??
+      PAYMENT_LABELS[row.payment_method] ??
+      row.payment_method,
     customer_name: row.customers?.name ?? null,
     customer_balance: row.customers ? Number(row.customers.balance) : null,
   }));

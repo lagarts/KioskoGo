@@ -23,9 +23,10 @@ import { formatCurrency } from '../../utils/format';
 import { listProducts, type ProductWithCategory } from '../../services/products.service';
 import { listCategories, type CategoryWithCount } from '../../services/categories.service';
 import { listCustomers } from '../../services/customers.service';
+import { listPaymentMethods, type PaymentMethodItem } from '../../services/paymentMethods.service';
 import { getOpenRegister } from '../../services/cash.service';
 import { recordSale, type SaleItemInput } from '../../services/sales.service';
-import type { CashRegister, Customer, PaymentMethod } from '../../types';
+import type { CashRegister, Customer } from '../../types';
 
 interface CartItem {
   id: string;
@@ -35,14 +36,14 @@ interface CartItem {
   unit: string;
 }
 
-const paymentMethods: { id: PaymentMethod; label: string; icon: React.ReactNode }[] = [
-  { id: 'cash', label: 'Efectivo', icon: <Banknote size={18} /> },
-  { id: 'debit', label: 'Tarjeta Débito', icon: <CreditCard size={18} /> },
-  { id: 'credit', label: 'Tarjeta Crédito', icon: <CreditCard size={18} /> },
-  { id: 'transfer', label: 'Transferencia', icon: <Smartphone size={18} /> },
-  { id: 'mercadopago', label: 'Mercado Pago', icon: <Smartphone size={18} /> },
-  { id: 'account', label: 'Cuenta Corriente', icon: <Users size={18} /> },
-];
+const METHOD_ICONS: Record<string, React.ReactNode> = {
+  cash: <Banknote size={18} />,
+  debit: <CreditCard size={18} />,
+  credit: <CreditCard size={18} />,
+  transfer: <Smartphone size={18} />,
+  mercadopago: <Smartphone size={18} />,
+  account: <Users size={18} />,
+};
 
 function unitLabel(unit: string): string {
   if (unit === 'unit') return 'uds';
@@ -53,6 +54,7 @@ export function POSPage() {
   const [products, setProducts] = useState<ProductWithCategory[]>([]);
   const [categories, setCategories] = useState<CategoryWithCount[]>([]);
   const [customers, setCustomers] = useState<Customer[]>([]);
+  const [paymentMethods, setPaymentMethods] = useState<PaymentMethodItem[]>([]);
   const [register, setRegister] = useState<CashRegister | null>(null);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState('');
@@ -61,7 +63,7 @@ export function POSPage() {
   const [selectedCategory, setSelectedCategory] = useState('all');
   const [showPayment, setShowPayment] = useState(false);
   const [calcMode, setCalcMode] = useState<'basic' | 'amount' | null>(null);
-  const [selectedPayment, setSelectedPayment] = useState<PaymentMethod>('cash');
+  const [selectedPayment, setSelectedPayment] = useState<string>('cash');
   const [selectedCustomerId, setSelectedCustomerId] = useState<string | null>(null);
   const [customerSearch, setCustomerSearch] = useState('');
   const [accountPaid, setAccountPaid] = useState('');
@@ -87,16 +89,21 @@ export function POSPage() {
   const loadAll = async () => {
     try {
       setLoadError('');
-      const [prods, cats, custs, openRegister] = await Promise.all([
+      const [prods, cats, custs, payMethods, openRegister] = await Promise.all([
         listProducts(),
         listCategories(),
         listCustomers(),
+        listPaymentMethods(),
         getOpenRegister(),
       ]);
       setProducts(prods);
       setCategories(cats);
       setCustomers(custs);
+      setPaymentMethods(payMethods);
       setRegister(openRegister);
+      setSelectedPayment((prev) =>
+        payMethods.some((m) => m.code === prev) ? prev : (payMethods[0]?.code ?? 'cash')
+      );
     } catch (err) {
       setLoadError(err instanceof Error ? err.message : 'Error cargando datos');
     } finally {
@@ -566,18 +573,18 @@ export function POSPage() {
             <div className="grid grid-cols-3 gap-2">
               {paymentMethods.map((method) => (
                 <button
-                  key={method.id}
-                  onClick={() => setSelectedPayment(method.id)}
+                  key={method.code}
+                  onClick={() => setSelectedPayment(method.code)}
                   className={`
                     flex flex-col items-center gap-1.5 p-3 rounded-xl border transition-colors
                     ${
-                      selectedPayment === method.id
+                      selectedPayment === method.code
                         ? 'border-kiosko-600 bg-kiosko-600/10 text-kiosko-500'
                         : 'border-surface-700 bg-surface-800 text-surface-300 hover:border-surface-600'
                     }
                   `}
                 >
-                  {method.icon}
+                  {METHOD_ICONS[method.code] ?? <CreditCard size={18} />}
                   <span className="text-[10px] font-medium">{method.label}</span>
                 </button>
               ))}

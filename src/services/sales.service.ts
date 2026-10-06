@@ -1,5 +1,4 @@
 import { supabase } from '../lib/supabase';
-import type { PaymentMethod } from '../types';
 
 export interface SaleItemInput {
   product_id: string;
@@ -11,7 +10,7 @@ export interface SaleItemInput {
 export interface RecordSaleInput {
   cash_register_id?: string | null;
   customer_id?: string | null;
-  payment_method: PaymentMethod;
+  payment_method: string;
   subtotal: number;
   discount: number;
   tax: number;

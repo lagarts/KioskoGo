@@ -17,7 +17,6 @@ import {
   getReport,
   getMonthSales,
   getCostsByMonth,
-  PAYMENT_LABELS,
   type ReportKey,
   type ReportResult,
   type ReportRow,
@@ -77,7 +76,7 @@ export function ReportsPage() {
     setDrillCost(0);
     try {
       const [salesDetail, costs] = await Promise.all([
-        getMonthSales(row.key),
+        getMonthSales(row.key, user.business_id),
         getCostsByMonth(user.business_id),
       ]);
       setDetail(salesDetail);
@@ -278,7 +277,7 @@ export function ReportsPage() {
                               : 'border-surface-700 bg-surface-800 text-surface-300'
                           }`}
                         >
-                          {PAYMENT_LABELS[sale.payment_method] ?? sale.payment_method}
+                          {sale.payment_method_label}
                         </span>
 
                         <p className="text-sm font-semibold text-kiosko-500 ml-auto">
