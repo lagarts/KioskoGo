@@ -1,6 +1,9 @@
 -- KioskoGo - Transferencias entre SUCURSALES (ejecutar en Supabase SQL Editor)
 -- Vincula cada sucursal con su depósito (warehouse) y permite transferir entre sucursales.
 
+-- 0. Borrar la versión anterior de la función si existe
+DROP FUNCTION IF EXISTS record_transfer(uuid, uuid, uuid, numeric, text);
+
 -- 1. Cada sucursal queda ligada a un depósito propio
 ALTER TABLE branches ADD COLUMN IF NOT EXISTS warehouse_id UUID REFERENCES warehouses(id);
 
