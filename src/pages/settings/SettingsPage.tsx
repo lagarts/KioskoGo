@@ -9,15 +9,7 @@ import {
   Barcode,
   Ticket,
   Wallet,
-  Package,
-  Bell,
-  Shield,
-  Smartphone,
-  Lock,
   HardDrive,
-  X,
-  KeyRound,
-  Mail,
 } from 'lucide-react';
 import { Card } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
@@ -32,39 +24,22 @@ import {
   type BusinessInput,
 } from '../../services/business.service';
 import { formatDate } from '../../utils/format';
-import { createCashier } from '../../services/cashiers.service';
-import { isValidUsername, displayUserEmail } from '../../lib/username';
+import { displayUserEmail } from '../../lib/username';
 import type { RubroType, Subscription, User, UserRole } from '../../types';
 
 type SettingsSection =
   | 'business'
   | 'users'
-  | 'roles'
   | 'subscription'
   | 'payment-methods'
-  | 'hardware'
-  | 'labels'
-  | 'tickets'
-  | 'cash'
-  | 'stock'
-  | 'notifications'
-  | 'pwa'
-  | 'security';
+  | 'hardware';
 
 const menuItems: { section: SettingsSection; label: string; icon: React.ReactNode }[] = [
   { section: 'business', label: 'Mi Comercio', icon: <Store size={18} /> },
   { section: 'users', label: 'Usuarios', icon: <Users size={18} /> },
-  { section: 'roles', label: 'Roles y Permisos', icon: <Shield size={18} /> },
   { section: 'subscription', label: 'Suscripción', icon: <CreditCard size={18} /> },
   { section: 'payment-methods', label: 'Métodos de pago', icon: <Wallet size={18} /> },
   { section: 'hardware', label: 'Hardware', icon: <HardDrive size={18} /> },
-  { section: 'labels', label: 'Etiquetas', icon: <Ticket size={18} /> },
-  { section: 'tickets', label: 'Tickets', icon: <Printer size={18} /> },
-  { section: 'cash', label: 'Caja', icon: <Wallet size={18} /> },
-  { section: 'stock', label: 'Stock', icon: <Package size={18} /> },
-  { section: 'notifications', label: 'Notificaciones', icon: <Bell size={18} /> },
-  { section: 'pwa', label: 'PWA', icon: <Smartphone size={18} /> },
-  { section: 'security', label: 'Seguridad', icon: <Lock size={18} /> },
 ];
 
 const rubros: { value: RubroType; label: string }[] = [
@@ -461,11 +436,6 @@ function UsersSection() {
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const [message, setMessage] = useState('');
-  const [showForm, setShowForm] = useState(false);
-  const [saving, setSaving] = useState(false);
-  const [formError, setFormError] = useState('');
-  const [formData, setFormData] = useState({ name: '', username: '', password: '' });
 
   const load = useCallback(async () => {
     if (!user?.business_id) return;
@@ -484,52 +454,14 @@ function UsersSection() {
     void load();
   }, [load]);
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (saving) return;
-    const username = formData.username.trim().toLowerCase();
-    if (!isValidUsername(username)) {
-      setFormError('Usuario inválido: 3 a 20 caracteres (letras, números, . o _), sin espacios ni @');
-      return;
-    }
-    setSaving(true);
-    setFormError('');
-    try {
-      await createCashier(username, formData.name, formData.password);
-      setShowForm(false);
-      setFormData({ name: '', username: '', password: '' });
-      setMessage(`Cuenta de ${username} creada. Ya puede ingresar con su usuario y contraseña.`);
-      await load();
-    } catch (err) {
-      setFormError(err instanceof Error ? err.message : 'Error al crear el usuario');
-    } finally {
-      setSaving(false);
-    }
-  };
-
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <h2 className="text-xl font-bold text-white">Usuarios</h2>
-        <Button
-          size="sm"
-          onClick={() => {
-            setFormData({ name: '', username: '', password: '' });
-            setFormError('');
-            setShowForm(true);
-          }}
-        >
-          <Users size={14} /> Nuevo usuario
-        </Button>
       </div>
       {error && (
         <div className="bg-red-900/30 border border-red-800 text-red-400 text-sm px-4 py-3 rounded-lg">
           {error}
-        </div>
-      )}
-      {message && (
-        <div className="bg-green-900/30 border border-green-800 text-green-400 text-sm px-4 py-3 rounded-lg">
-          {message}
         </div>
       )}
       {loading ? (
@@ -565,66 +497,6 @@ function UsersSection() {
             </tbody>
           </table>
         </Card>
-      )}
-
-      {showForm && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-          <div className="absolute inset-0 bg-black/70" onClick={() => setShowForm(false)} />
-          <div className="relative bg-surface-900 border border-surface-700 rounded-2xl w-full max-w-md p-6">
-            <div className="flex items-center justify-between mb-6">
-              <h2 className="text-xl font-bold text-white">Nuevo usuario</h2>
-              <button onClick={() => setShowForm(false)} className="text-surface-400 hover:text-white">
-                <X size={20} />
-              </button>
-            </div>
-            <form onSubmit={handleSubmit} className="space-y-4">
-              <Input
-                label="Nombre *"
-                value={formData.name}
-                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                placeholder="Nombre del cajero"
-                required
-              />
-              <Input
-                label="Usuario *"
-                type="text"
-                value={formData.username}
-                onChange={(e) => setFormData({ ...formData, username: e.target.value })}
-                placeholder="ej: juan123"
-                icon={<Mail size={16} />}
-                autoComplete="off"
-                required
-                maxLength={20}
-              />
-              <Input
-                label="Contraseña *"
-                type="password"
-                value={formData.password}
-                onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-                placeholder="••••••••"
-                icon={<KeyRound size={16} />}
-                required
-                minLength={6}
-              />
-              <p className="text-xs text-surface-500">
-                Se crea una cuenta de <strong className="text-surface-300">cajero</strong>: ingresa con su usuario y contraseña (sin @). Solo ve Caja y Cargar Ventas.
-              </p>
-              {formError && (
-                <div className="bg-red-900/30 border border-red-800 text-red-400 text-xs px-3 py-2 rounded-lg">
-                  {formError}
-                </div>
-              )}
-              <div className="flex gap-3 pt-2">
-                <Button type="button" variant="secondary" fullWidth onClick={() => setShowForm(false)}>
-                  Cancelar
-                </Button>
-                <Button type="submit" fullWidth disabled={saving}>
-                  {saving ? 'Creando...' : 'Crear usuario'}
-                </Button>
-              </div>
-            </form>
-          </div>
-        </div>
       )}
     </div>
   );
