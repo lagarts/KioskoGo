@@ -22,8 +22,8 @@ import { BarcodePage } from './pages/barcode/BarcodePage';
 import { SalesHistoryPage } from './pages/sales/SalesHistoryPage';
 import { PurchasesPage } from './pages/purchases/PurchasesPage';
 import { StockPage } from './pages/stock/StockPage';
+import { TransfersPage } from './pages/transfers/TransfersPage';
 import {
-  ArrowLeftRight,
   Ticket,
   FileText,
 } from 'lucide-react';
@@ -127,9 +127,7 @@ function App() {
         path="/transfers"
         element={
           <ProtectedRoute>
-            <MainLayout>
-              <PlaceholderPage title="Transferencias" description="Transfiere productos entre depósitos" icon={<ArrowLeftRight size={20} />} />
-            </MainLayout>
+            <MainLayout><TransfersPage /></MainLayout>
           </ProtectedRoute>
         }
       />
