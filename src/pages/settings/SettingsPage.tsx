@@ -8,7 +8,6 @@ import {
   Scale,
   Barcode,
   Ticket,
-  Wallet,
   HardDrive,
 } from 'lucide-react';
 import { Card } from '../../components/ui/Card';
@@ -31,14 +30,12 @@ type SettingsSection =
   | 'business'
   | 'users'
   | 'subscription'
-  | 'payment-methods'
   | 'hardware';
 
 const menuItems: { section: SettingsSection; label: string; icon: React.ReactNode }[] = [
   { section: 'business', label: 'Mi Comercio', icon: <Store size={18} /> },
   { section: 'users', label: 'Usuarios', icon: <Users size={18} /> },
   { section: 'subscription', label: 'Suscripción', icon: <CreditCard size={18} /> },
-  { section: 'payment-methods', label: 'Métodos de pago', icon: <Wallet size={18} /> },
   { section: 'hardware', label: 'Hardware', icon: <HardDrive size={18} /> },
 ];
 
