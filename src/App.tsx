@@ -18,10 +18,10 @@ import { CashiersPage } from './pages/cashiers/CashiersPage';
 import { PaymentMethodsPage } from './pages/payment-methods/PaymentMethodsPage';
 import { SupportPage } from './pages/support/SupportPage';
 import { PlaceholderPage } from './pages/PlaceholderPage';
+import { BarcodePage } from './pages/barcode/BarcodePage';
 import {
   Warehouse,
   ArrowLeftRight,
-  Barcode,
   Ticket,
   FileText,
   Receipt,
@@ -144,9 +144,7 @@ function App() {
         path="/barcode"
         element={
           <ProtectedRoute>
-            <MainLayout>
-              <PlaceholderPage title="Códigos de Barras" description="Genera e imprime códigos de barras" icon={<Barcode size={20} />} />
-            </MainLayout>
+            <MainLayout><BarcodePage /></MainLayout>
           </ProtectedRoute>
         }
       />
