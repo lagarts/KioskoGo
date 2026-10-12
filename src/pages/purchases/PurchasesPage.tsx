@@ -4,7 +4,6 @@ import { Card } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
 import { Badge } from '../../components/ui/Badge';
 import { Input } from '../../components/ui/Input';
-import { useAuth } from '../../contexts/AuthContext';
 import { listSuppliers } from '../../services/suppliers.service';
 import { listProducts } from '../../services/products.service';
 import {
@@ -23,7 +22,6 @@ interface PurchaseRow {
 }
 
 export function PurchasesPage() {
-  const { user } = useAuth();
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
   const [purchases, setPurchases] = useState<PurchaseListItem[]>([]);
