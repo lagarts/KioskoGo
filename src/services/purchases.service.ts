@@ -4,6 +4,7 @@ export interface PurchaseInput {
   supplierId: string | null;
   notes: string;
   received: boolean;
+  branchId?: string | null;
   items: { product_id: string; quantity: number; unit_cost: number }[];
 }
 
@@ -22,6 +23,7 @@ export async function recordPurchase(input: PurchaseInput): Promise<void> {
     p_supplier_id: input.supplierId,
     p_notes: input.notes,
     p_received: input.received,
+    p_branch_id: input.branchId ?? null,
     p_items: input.items,
   });
   if (error) throw new Error(error.message);

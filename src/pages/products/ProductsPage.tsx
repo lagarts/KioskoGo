@@ -172,7 +172,7 @@ export function ProductsPage() {
       } else {
         const created = await createProduct(input, user!.business_id);
         if (branches.length > 0) {
-          await setProductBranches(created.id, formBranches);
+          await setProductBranches(created.id, formBranches, input.stock);
         }
       }
       setShowForm(false);

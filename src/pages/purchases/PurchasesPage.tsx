@@ -6,12 +6,13 @@ import { Badge } from '../../components/ui/Badge';
 import { Input } from '../../components/ui/Input';
 import { listSuppliers } from '../../services/suppliers.service';
 import { listProducts } from '../../services/products.service';
+import { listBranches } from '../../services/branches.service';
 import {
   recordPurchase,
   listPurchases,
   type PurchaseListItem,
 } from '../../services/purchases.service';
-import type { Supplier, Product } from '../../types';
+import type { Supplier, Product, Branch } from '../../types';
 import { formatCurrency, formatDate, formatTime } from '../../utils/format';
 
 interface PurchaseRow {
@@ -24,6 +25,7 @@ interface PurchaseRow {
 export function PurchasesPage() {
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
+  const [branches, setBranches] = useState<Branch[]>([]);
   const [purchases, setPurchases] = useState<PurchaseListItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -32,6 +34,7 @@ export function PurchasesPage() {
   const [showForm, setShowForm] = useState(false);
   const [saving, setSaving] = useState(false);
   const [supplierId, setSupplierId] = useState('');
+  const [branchId, setBranchId] = useState('');
   const [notes, setNotes] = useState('');
   const [received, setReceived] = useState(true);
   const [rows, setRows] = useState<PurchaseRow[]>([]);
@@ -40,14 +43,16 @@ export function PurchasesPage() {
 
   const load = useCallback(async () => {
     try {
-      const [sup, prods, purs] = await Promise.all([
+      const [sup, prods, purs, brs] = await Promise.all([
         listSuppliers(),
         listProducts(),
         listPurchases(),
+        listBranches(),
       ]);
       setSuppliers(sup);
       setProducts(prods);
       setPurchases(purs);
+      setBranches(brs.filter((b) => b.active));
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Error cargando datos');
     } finally {
@@ -109,6 +114,7 @@ export function PurchasesPage() {
 
   const resetForm = () => {
     setSupplierId('');
+    setBranchId('');
     setNotes('');
     setReceived(true);
     setRows([]);
@@ -135,6 +141,7 @@ export function PurchasesPage() {
         supplierId: supplierId || null,
         notes,
         received,
+        branchId: branchId || null,
         items: rows.map((r) => ({
           product_id: r.productId,
           quantity: r.quantity,
@@ -202,7 +209,7 @@ export function PurchasesPage() {
           </div>
 
           <form onSubmit={handleSubmit} className="space-y-5">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div>
                 <label className="block text-sm font-medium text-surface-300 mb-1.5">Proveedor</label>
                 <select
@@ -219,6 +226,23 @@ export function PurchasesPage() {
                   ))}
                 </select>
               </div>
+              {branches.length > 0 && (
+                <div>
+                  <label className="block text-sm font-medium text-surface-300 mb-1.5">Sucursal destino</label>
+                  <select
+                    value={branchId}
+                    onChange={(e) => setBranchId(e.target.value)}
+                    className="w-full bg-surface-800 border border-surface-700 rounded-lg px-4 py-2.5 text-sm text-white outline-none focus:ring-2 focus:ring-kiosko-500/50"
+                  >
+                    <option value="">Primera sucursal</option>
+                    {branches.map((b) => (
+                      <option key={b.id} value={b.id}>
+                        {b.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
               <Input
                 label="Notas (opcional)"
                 value={notes}

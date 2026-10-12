@@ -53,15 +53,41 @@ export async function getProductBranches(productId: string): Promise<string[]> {
   return (data ?? []).map((row) => row.branch_id as string);
 }
 
-export async function setProductBranches(productId: string, branchIds: string[]): Promise<void> {
-  const { error: delError } = await supabase
+export async function setProductBranches(productId: string, branchIds: string[], initialStock = 0): Promise<void> {
+  const { data: existing, error: fetchError } = await supabase
     .from('product_branches')
-    .delete()
+    .select('branch_id, stock')
     .eq('product_id', productId);
-  if (delError) throw new Error(delError.message);
-  if (branchIds.length === 0) return;
-  const { error: insError } = await supabase
-    .from('product_branches')
-    .insert(branchIds.map((branchId) => ({ product_id: productId, branch_id: branchId })));
-  if (insError) throw new Error(insError.message);
+  if (fetchError) throw new Error(fetchError.message);
+
+  const stockMap = new Map<string, number>();
+  for (const row of (existing ?? []) as { branch_id: string; stock: number }[]) {
+    stockMap.set(row.branch_id, Number(row.stock));
+  }
+
+  const toRemove = (existing ?? [])
+    .map((r) => (r as { branch_id: string }).branch_id)
+    .filter((bid) => !branchIds.includes(bid));
+  if (toRemove.length > 0) {
+    const { error: delError } = await supabase
+      .from('product_branches')
+      .delete()
+      .eq('product_id', productId)
+      .in('branch_id', toRemove);
+    if (delError) throw new Error(delError.message);
+  }
+
+  const toInsert = branchIds
+    .filter((bid) => !stockMap.has(bid))
+    .map((bid, i) => ({
+      product_id: productId,
+      branch_id: bid,
+      stock: stockMap.size === 0 && i === 0 ? initialStock : 0,
+    }));
+  if (toInsert.length > 0) {
+    const { error: insError } = await supabase
+      .from('product_branches')
+      .insert(toInsert);
+    if (insError) throw new Error(insError.message);
+  }
 }
