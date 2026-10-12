@@ -19,12 +19,12 @@ import { PaymentMethodsPage } from './pages/payment-methods/PaymentMethodsPage';
 import { SupportPage } from './pages/support/SupportPage';
 import { PlaceholderPage } from './pages/PlaceholderPage';
 import { BarcodePage } from './pages/barcode/BarcodePage';
+import { SalesHistoryPage } from './pages/sales/SalesHistoryPage';
 import {
   Warehouse,
   ArrowLeftRight,
   Ticket,
   FileText,
-  Receipt,
   ShoppingCart as PurchaseIcon,
 } from 'lucide-react';
 
@@ -100,9 +100,7 @@ function App() {
         path="/sales"
         element={
           <ProtectedRoute>
-            <MainLayout>
-              <PlaceholderPage title="Historial de Ventas" description="Registro completo de todas las ventas realizadas" icon={<Receipt size={20} />} />
-            </MainLayout>
+            <MainLayout><SalesHistoryPage /></MainLayout>
           </ProtectedRoute>
         }
       />
