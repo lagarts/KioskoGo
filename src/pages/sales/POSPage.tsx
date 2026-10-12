@@ -89,13 +89,14 @@ export function POSPage() {
   const loadAll = async () => {
     try {
       setLoadError('');
-      const [prods, cats, custs, payMethods, openRegister] = await Promise.all([
+      const [prods, cats, custs, allPayMethods, openRegister] = await Promise.all([
         listSellableProducts(),
         listCategories(),
         listCustomers(),
         listPaymentMethods(),
         getOpenRegister(),
       ]);
+      const payMethods = allPayMethods.filter((m) => m.kind === 'cobro');
       setProducts(prods);
       setCategories(cats);
       setCustomers(custs);

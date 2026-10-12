@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { CreditCard, Plus, Trash2, Lock, Info } from 'lucide-react';
+import { CreditCard, Lock, Info } from 'lucide-react';
 import { Card } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Input';
@@ -10,6 +10,7 @@ import {
   createPaymentMethod,
   deletePaymentMethod,
   type PaymentMethodItem,
+  type PaymentMethodKind,
 } from '../../services/paymentMethods.service';
 
 export function PaymentMethodsPage() {
@@ -18,6 +19,7 @@ export function PaymentMethodsPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [label, setLabel] = useState('');
+  const [kind, setKind] = useState<PaymentMethodKind>('cobro');
   const [saving, setSaving] = useState(false);
 
   const load = async () => {
@@ -48,7 +50,7 @@ export function PaymentMethodsPage() {
     }
     setSaving(true);
     try {
-      const created = await createPaymentMethod(clean, user.business_id);
+      const created = await createPaymentMethod(clean, user.business_id, kind);
       setMethods((prev) => [...prev, created]);
       setLabel('');
       setError('');
@@ -70,6 +72,9 @@ export function PaymentMethodsPage() {
     }
   };
 
+  const cobroCount = methods.filter((m) => m.kind === 'cobro').length;
+  const pagoCount = methods.filter((m) => m.kind === 'pago').length;
+
   return (
     <div className="max-w-3xl mx-auto space-y-6">
       <div className="flex items-center gap-3">
@@ -83,68 +88,85 @@ export function PaymentMethodsPage() {
       </div>
 
       <Card>
+        <h2 className="text-lg font-bold text-green-500 mb-1">Métodos de pago</h2>
+        <p className="text-sm text-surface-400 mb-4">
+          Estos métodos aparecen en el Panel de Cobro del Cargar Ventas / POS.
+        </p>
+
         <form onSubmit={handleAdd} className="flex flex-col sm:flex-row gap-3">
           <div className="flex-1">
             <Input
-              label="Nuevo método"
-              placeholder="Ej.: Cheque, Billetera Virtual, Cripto..."
+              placeholder="Nombre del método"
               value={label}
               onChange={(e) => setLabel(e.target.value)}
               maxLength={40}
+              autoComplete="off"
             />
           </div>
-          <div className="flex items-end">
-            <Button type="submit" disabled={saving || !label.trim()}>
-              <Plus size={16} />
+          <div className="flex items-end gap-3">
+            <select
+              value={kind}
+              onChange={(e) => setKind(e.target.value as PaymentMethodKind)}
+              className="bg-surface-800 border border-surface-700 rounded-lg px-4 py-2.5 text-sm text-white outline-none focus:ring-2 focus:ring-kiosko-500/50"
+            >
+              <option value="cobro">Cobro</option>
+              <option value="pago">Pago</option>
+            </select>
+            <Button type="submit" variant="success" disabled={saving || !label.trim()}>
               {saving ? 'Agregando...' : 'Agregar'}
             </Button>
           </div>
         </form>
+
         {error && <p className="text-sm text-red-400 mt-3">{error}</p>}
+
+        <p className="text-sm text-surface-300 mt-4">
+          Métodos de cobro: <span className="font-bold text-white">{cobroCount}</span>
+          {' | '}
+          Métodos de pago: <span className="font-bold text-white">{pagoCount}</span>
+        </p>
       </Card>
 
-      <Card padding={false}>
+      <div className="space-y-3">
         {loading ? (
           <p className="text-sm text-surface-400 text-center py-10">Cargando...</p>
         ) : (
-          <div className="divide-y divide-surface-800">
-            {methods.map((method) => (
-              <div
-                key={method.id}
-                className="flex items-center justify-between gap-3 px-4 py-3"
-              >
-                <div className="flex items-center gap-3 min-w-0">
-                  <div className="w-8 h-8 rounded-lg bg-surface-800 border border-surface-700 flex items-center justify-center shrink-0">
-                    <CreditCard size={14} className="text-kiosko-500" />
-                  </div>
-                  <p className="text-sm font-medium text-white truncate">{method.label}</p>
-                  {method.code === 'cash' && (
-                    <span className="inline-flex items-center gap-1 text-[10px] text-surface-500 border border-surface-700 rounded px-2 py-0.5 shrink-0">
-                      <Lock size={10} />
-                      No se puede eliminar
-                    </span>
-                  )}
-                </div>
-                {method.code !== 'cash' && (
-                  <button
-                    onClick={() => void handleDelete(method)}
-                    className="p-2 rounded-lg text-surface-400 hover:text-red-400 hover:bg-red-900/20 transition-colors shrink-0"
-                    title="Eliminar método"
-                  >
-                    <Trash2 size={15} />
-                  </button>
-                )}
+          methods.map((method) => (
+            <div
+              key={method.id}
+              className="flex items-center justify-between gap-3 bg-surface-800/60 border border-surface-700 rounded-xl px-5 py-4"
+            >
+              <div className="min-w-0">
+                <p className="text-base font-bold text-white uppercase tracking-wide truncate">
+                  {method.label}
+                </p>
+                <p className="text-xs text-surface-400 capitalize">{method.kind}</p>
               </div>
-            ))}
-          </div>
+              {method.code === 'cash' ? (
+                <span className="inline-flex items-center gap-1 text-[11px] text-surface-500 border border-surface-700 rounded px-2 py-1 shrink-0">
+                  <Lock size={11} />
+                  Obligatorio
+                </span>
+              ) : (
+                <Button
+                  variant="danger"
+                  size="sm"
+                  onClick={() => void handleDelete(method)}
+                >
+                  Eliminar
+                </Button>
+              )}
+            </div>
+          ))
         )}
-      </Card>
+      </div>
 
       <div className="flex items-start gap-2 text-xs text-surface-500">
         <Info size={14} className="shrink-0 mt-0.5" />
         <p>
-          Estos son los métodos que aparecen al cobrar en el POS. "Efectivo" es obligatorio por la
-          caja, y si eliminás "Cuenta Corriente" se desactiva esa opción en las ventas.
+          Los métodos de <strong className="text-surface-300">cobro</strong> son los que elige el
+          cliente al pagar en el POS. "Efectivo" es obligatorio por la caja, y si eliminás "Cuenta
+          Corriente" se desactiva esa opción en las ventas.
         </p>
       </div>
     </div>
