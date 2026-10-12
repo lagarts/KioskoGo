@@ -19,6 +19,7 @@ import { Badge } from '../../components/ui/Badge';
 import { Input } from '../../components/ui/Input';
 import { formatCurrency } from '../../utils/format';
 import { useAuth } from '../../contexts/AuthContext';
+import { canSeeFinancials } from '../../lib/roles';
 import {
   listProducts,
   createProduct,
@@ -49,6 +50,7 @@ function toUnitType(unit: UnitFormValue): UnitType {
 
 export function ProductsPage() {
   const { user } = useAuth();
+  const showCosts = !!user && canSeeFinancials(user.role);
   const [products, setProducts] = useState<ProductWithCategory[]>([]);
   const [categories, setCategories] = useState<CategoryWithCount[]>([]);
   const [branches, setBranches] = useState<Branch[]>([]);
@@ -312,7 +314,9 @@ export function ProductsPage() {
                 <th className="text-left px-4 py-3 text-xs font-semibold text-surface-400 uppercase">Producto</th>
                 <th className="text-left px-4 py-3 text-xs font-semibold text-surface-400 uppercase hidden md:table-cell">SKU</th>
                 <th className="text-left px-4 py-3 text-xs font-semibold text-surface-400 uppercase hidden lg:table-cell">Categoría</th>
-                <th className="text-right px-4 py-3 text-xs font-semibold text-surface-400 uppercase">Costo</th>
+                {showCosts && (
+                  <th className="text-right px-4 py-3 text-xs font-semibold text-surface-400 uppercase">Costo</th>
+                )}
                 <th className="text-right px-4 py-3 text-xs font-semibold text-surface-400 uppercase">Precio</th>
                 <th className="text-center px-4 py-3 text-xs font-semibold text-surface-400 uppercase">Stock</th>
                 <th className="text-center px-4 py-3 text-xs font-semibold text-surface-400 uppercase">Estado</th>
@@ -355,7 +359,9 @@ export function ProductsPage() {
                   <td className="px-4 py-3 hidden lg:table-cell">
                     <Badge>{product.categories?.name ?? '—'}</Badge>
                   </td>
-                  <td className="px-4 py-3 text-right text-surface-300">{formatCurrency(product.cost)}</td>
+                  {showCosts && (
+                    <td className="px-4 py-3 text-right text-surface-300">{formatCurrency(product.cost)}</td>
+                  )}
                   <td className="px-4 py-3 text-right font-semibold text-kiosko-500">{formatCurrency(product.price)}</td>
                   <td className="px-4 py-3 text-center">
                     <span className={`font-medium ${product.stock <= product.min_stock ? 'text-red-400' : 'text-green-400'}`}>
@@ -426,7 +432,9 @@ export function ProductsPage() {
                     <option value="m">Metro</option>
                   </select>
                 </div>
-                <Input label="Costo ($)" type="number" value={formData.cost} onChange={(e) => setFormData({ ...formData, cost: e.target.value })} />
+                {showCosts && (
+                  <Input label="Costo ($)" type="number" value={formData.cost} onChange={(e) => setFormData({ ...formData, cost: e.target.value })} />
+                )}
                 <Input label="Precio de venta ($)" type="number" value={formData.price} onChange={(e) => setFormData({ ...formData, price: e.target.value })} required />
                 <Input label="Stock actual" type="number" value={formData.stock} onChange={(e) => setFormData({ ...formData, stock: e.target.value })} />
                 <Input label="Stock mínimo" type="number" value={formData.minStock} onChange={(e) => setFormData({ ...formData, minStock: e.target.value })} />

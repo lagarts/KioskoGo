@@ -13,6 +13,7 @@ import {
 import { Card } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
 import { useAuth } from '../../contexts/AuthContext';
+import { canSeeFinancials } from '../../lib/roles';
 import {
   getReport,
   getMonthSales,
@@ -40,6 +41,7 @@ const reportOptions: {
 
 export function ReportsPage() {
   const { user } = useAuth();
+  const showCosts = !!user && canSeeFinancials(user.role);
   const [active, setActive] = useState<ReportKey | null>(null);
   const [result, setResult] = useState<ReportResult | null>(null);
   const [loading, setLoading] = useState(false);
@@ -195,7 +197,9 @@ export function ReportsPage() {
                 const detailMargin =
                   detailTotal > 0 ? Math.round((detailProfit / detailTotal) * 100) : 0;
                 return (
-                  <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+                  <div
+                    className={`grid grid-cols-2 gap-4 ${showCosts ? 'lg:grid-cols-4' : 'lg:grid-cols-2'}`}
+                  >
                     <Card>
                       <p className="text-sm text-surface-400">Ventas</p>
                       <p className="text-2xl font-bold text-white mt-1">{detail.length}</p>
@@ -206,25 +210,29 @@ export function ReportsPage() {
                         {formatCurrency(detailTotal)}
                       </p>
                     </Card>
-                    <Card>
-                      <p className="text-sm text-surface-400">Costos</p>
-                      <p className="text-2xl font-bold text-white mt-1">
-                        {formatCurrency(drillCost)}
-                      </p>
-                    </Card>
-                    <Card>
-                      <p className="text-sm text-surface-400">Beneficio</p>
-                      <p
-                        className={`text-2xl font-bold mt-1 ${
-                          detailProfit >= 0 ? 'text-green-400' : 'text-red-400'
-                        }`}
-                      >
-                        {formatCurrency(detailProfit)}
-                      </p>
-                      <p className="text-xs text-surface-500 mt-1">
-                        Rentabilidad: {detailMargin}%
-                      </p>
-                    </Card>
+                    {showCosts && (
+                      <Card>
+                        <p className="text-sm text-surface-400">Costos</p>
+                        <p className="text-2xl font-bold text-white mt-1">
+                          {formatCurrency(drillCost)}
+                        </p>
+                      </Card>
+                    )}
+                    {showCosts && (
+                      <Card>
+                        <p className="text-sm text-surface-400">Beneficio</p>
+                        <p
+                          className={`text-2xl font-bold mt-1 ${
+                            detailProfit >= 0 ? 'text-green-400' : 'text-red-400'
+                          }`}
+                        >
+                          {formatCurrency(detailProfit)}
+                        </p>
+                        <p className="text-xs text-surface-500 mt-1">
+                          Rentabilidad: {detailMargin}%
+                        </p>
+                      </Card>
+                    )}
                   </div>
                 );
               })()}
@@ -334,7 +342,7 @@ export function ReportsPage() {
                       <th className="text-right px-4 py-3 text-xs font-semibold text-surface-400 uppercase">
                         {active === 'ranking' ? 'Unidades' : 'Ventas'}
                       </th>
-                      {active === 'mes' && (
+                      {active === 'mes' && showCosts && (
                         <>
                           <th className="text-right px-4 py-3 text-xs font-semibold text-surface-400 uppercase hidden md:table-cell">
                             Costos
@@ -345,7 +353,7 @@ export function ReportsPage() {
                         </>
                       )}
                       <th className="text-right px-4 py-3 text-xs font-semibold text-surface-400 uppercase">Total</th>
-                      {active === 'mes' && (
+                      {active === 'mes' && showCosts && (
                         <th className="text-right px-4 py-3 text-xs font-semibold text-surface-400 uppercase hidden md:table-cell">
                           Rentabilidad
                         </th>
@@ -375,7 +383,7 @@ export function ReportsPage() {
                             {row.sublabel && <p className="text-xs text-surface-500">{row.sublabel}</p>}
                           </td>
                           <td className="px-4 py-3 text-right text-surface-300">{row.count}</td>
-                          {active === 'mes' && (
+                          {active === 'mes' && showCosts && (
                             <>
                               <td className="px-4 py-3 text-right text-surface-300 hidden md:table-cell">
                                 {formatCurrency(rowCost)}
@@ -392,7 +400,7 @@ export function ReportsPage() {
                           <td className="px-4 py-3 text-right font-semibold text-kiosko-500">
                             {formatCurrency(row.total)}
                           </td>
-                          {active === 'mes' && (
+                          {active === 'mes' && showCosts && (
                             <td className="px-4 py-3 text-right text-surface-300 hidden md:table-cell">
                               {rowMargin}%
                             </td>

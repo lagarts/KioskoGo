@@ -6,3 +6,7 @@ export function canAccessPath(role: UserRole, path: string): boolean {
   if (role !== 'cajero') return true;
   return CAJERO_ALLOWED_PATHS.includes(path);
 }
+
+export function canSeeFinancials(role: UserRole): boolean {
+  return role !== 'cajero';
+}

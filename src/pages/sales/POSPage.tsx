@@ -20,7 +20,7 @@ import { Button } from '../../components/ui/Button';
 import { Badge } from '../../components/ui/Badge';
 import { CalculatorModal } from '../../components/ui/CalculatorModal';
 import { formatCurrency } from '../../utils/format';
-import { listProducts, type ProductWithCategory } from '../../services/products.service';
+import { listSellableProducts, type SellableProduct } from '../../services/products.service';
 import { listCategories, type CategoryWithCount } from '../../services/categories.service';
 import { listCustomers } from '../../services/customers.service';
 import { listPaymentMethods, type PaymentMethodItem } from '../../services/paymentMethods.service';
@@ -51,7 +51,7 @@ function unitLabel(unit: string): string {
 }
 
 export function POSPage() {
-  const [products, setProducts] = useState<ProductWithCategory[]>([]);
+  const [products, setProducts] = useState<SellableProduct[]>([]);
   const [categories, setCategories] = useState<CategoryWithCount[]>([]);
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [paymentMethods, setPaymentMethods] = useState<PaymentMethodItem[]>([]);
@@ -75,7 +75,7 @@ export function POSPage() {
   const [lastSaleCustomerName, setLastSaleCustomerName] = useState('');
   const [lastSalePaid, setLastSalePaid] = useState(0);
   const searchRef = useRef<HTMLInputElement>(null);
-  const productsRef = useRef<ProductWithCategory[]>([]);
+  const productsRef = useRef<SellableProduct[]>([]);
   const calcOpenRef = useRef(false);
 
   useEffect(() => {
@@ -90,7 +90,7 @@ export function POSPage() {
     try {
       setLoadError('');
       const [prods, cats, custs, payMethods, openRegister] = await Promise.all([
-        listProducts(),
+        listSellableProducts(),
         listCategories(),
         listCustomers(),
         listPaymentMethods(),
@@ -141,7 +141,7 @@ export function POSPage() {
       : 0;
   const chargedToAccount = cartTotal - accountPaidAmount;
 
-  const addToCart = (product: ProductWithCategory) => {
+  const addToCart = (product: SellableProduct) => {
     setCart((prev) => {
       const existing = prev.find((item) => item.id === product.id);
       if (existing) {
@@ -217,7 +217,7 @@ export function POSPage() {
       setCustomerSearch('');
       setAccountPaid('');
       setAmountPaid('');
-      const [prods, custs] = await Promise.all([listProducts(), listCustomers()]);
+      const [prods, custs] = await Promise.all([listSellableProducts(), listCustomers()]);
       setProducts(prods);
       setCustomers(custs);
     } catch (err) {

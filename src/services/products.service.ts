@@ -30,6 +30,21 @@ export async function listProducts(): Promise<ProductWithCategory[]> {
   return (data ?? []) as ProductWithCategory[];
 }
 
+export type SellableProduct = Omit<Product, 'cost'> & {
+  categories?: Pick<Category, 'id' | 'name' | 'icon' | 'color'> | null;
+};
+
+export async function listSellableProducts(): Promise<SellableProduct[]> {
+  const { data, error } = await supabase
+    .from('products')
+    .select(
+      'id, business_id, name, description, sku, barcode, price, stock, min_stock, unit, tax, image, active, category_id, created_at, updated_at, categories(id, name, icon, color)'
+    )
+    .order('name');
+  if (error) throw new Error(error.message);
+  return (data ?? []) as unknown as SellableProduct[];
+}
+
 export async function createProduct(input: ProductInput, businessId: string): Promise<Product> {
   const { data, error } = await supabase
     .from('products')
