@@ -1,22 +1,22 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { ArrowLeftRight, ArrowRight, Search, History } from 'lucide-react';
+import { ArrowLeftRight, ArrowRight, Search, History, Building2 } from 'lucide-react';
 import { Card } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
 import { Badge } from '../../components/ui/Badge';
 import { Input } from '../../components/ui/Input';
 import { listProducts } from '../../services/products.service';
-import { listWarehouses } from '../../services/warehouses.service';
+import { listBranches } from '../../services/branches.service';
 import {
   recordTransfer,
   listTransfers,
   type TransferListItem,
 } from '../../services/transfers.service';
-import type { Product, Warehouse } from '../../types';
+import type { Product, Branch } from '../../types';
 import { formatDate, formatTime } from '../../utils/format';
 
 export function TransfersPage() {
   const [products, setProducts] = useState<Product[]>([]);
-  const [warehouses, setWarehouses] = useState<Warehouse[]>([]);
+  const [branches, setBranches] = useState<Branch[]>([]);
   const [transfers, setTransfers] = useState<TransferListItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -32,13 +32,13 @@ export function TransfersPage() {
 
   const load = useCallback(async () => {
     try {
-      const [prods, whs, trs] = await Promise.all([
+      const [prods, brs, trs] = await Promise.all([
         listProducts(),
-        listWarehouses(),
+        listBranches(),
         listTransfers(),
       ]);
       setProducts(prods.filter((p) => p.active));
-      setWarehouses(whs);
+      setBranches(brs.filter((b) => b.active));
       setTransfers(trs);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Error cargando datos');
@@ -69,11 +69,11 @@ export function TransfersPage() {
     e.preventDefault();
     if (saving) return;
     if (!pickedProductId || !fromId || !toId) {
-      setError('Elegí el producto y ambos depósitos');
+      setError('Elegí el producto y ambas sucursales');
       return;
     }
     if (fromId === toId) {
-      setError('Los depósitos deben ser distintos');
+      setError('Las sucursales deben ser distintas');
       return;
     }
     const qty = parseFloat(quantity);
@@ -86,8 +86,8 @@ export function TransfersPage() {
     try {
       await recordTransfer({
         productId: pickedProductId,
-        fromWarehouseId: fromId,
-        toWarehouseId: toId,
+        fromBranchId: fromId,
+        toBranchId: toId,
         quantity: qty,
         notes,
       });
@@ -113,7 +113,7 @@ export function TransfersPage() {
         </div>
         <div>
           <h1 className="text-2xl font-bold text-white">Transferencias</h1>
-          <p className="text-sm text-surface-400">Transfiere productos entre depósitos</p>
+          <p className="text-sm text-surface-400">Transfiere productos entre sucursales</p>
         </div>
       </div>
 
@@ -128,12 +128,17 @@ export function TransfersPage() {
         </div>
       )}
 
-      {warehouses.length < 2 ? (
+      {branches.length < 2 ? (
         <Card>
-          <p className="text-sm text-surface-400 text-center py-8">
-            Necesitás al menos dos depósitos para hacer transferencias. Cargalos desde la base de
-            datos o creá un depósito nuevo.
-          </p>
+          <div className="text-center py-8 space-y-2">
+            <Building2 size={32} className="text-surface-600 mx-auto" />
+            <p className="text-sm text-surface-400">
+              Necesitás al menos dos sucursales activas para hacer transferencias.
+            </p>
+            <p className="text-xs text-surface-500">
+              Crealas desde <span className="text-surface-300">Configuración → Sucursales</span>.
+            </p>
+          </div>
         </Card>
       ) : (
         <Card>
@@ -190,10 +195,10 @@ export function TransfersPage() {
                   onChange={(e) => setFromId(e.target.value)}
                   className="w-full bg-surface-800 border border-surface-700 rounded-lg px-4 py-2.5 text-sm text-white outline-none focus:ring-2 focus:ring-kiosko-500/50"
                 >
-                  <option value="">Elegir depósito...</option>
-                  {warehouses.map((wh) => (
-                    <option key={wh.id} value={wh.id} disabled={wh.id === toId}>
-                      {wh.name}
+                  <option value="">Elegir sucursal...</option>
+                  {branches.map((br) => (
+                    <option key={br.id} value={br.id} disabled={br.id === toId}>
+                      {br.name}
                     </option>
                   ))}
                 </select>
@@ -208,10 +213,10 @@ export function TransfersPage() {
                   onChange={(e) => setToId(e.target.value)}
                   className="w-full bg-surface-800 border border-surface-700 rounded-lg px-4 py-2.5 text-sm text-white outline-none focus:ring-2 focus:ring-kiosko-500/50"
                 >
-                  <option value="">Elegir depósito...</option>
-                  {warehouses.map((wh) => (
-                    <option key={wh.id} value={wh.id} disabled={wh.id === fromId}>
-                      {wh.name}
+                  <option value="">Elegir sucursal...</option>
+                  {branches.map((br) => (
+                    <option key={br.id} value={br.id} disabled={br.id === fromId}>
+                      {br.name}
                     </option>
                   ))}
                 </select>
@@ -237,7 +242,7 @@ export function TransfersPage() {
             </div>
 
             <p className="text-xs text-surface-500">
-              La transferencia registra el movimiento entre depósitos. El stock total del producto
+              La transferencia registra el movimiento entre sucursales. El stock total del producto
               no cambia.
             </p>
 

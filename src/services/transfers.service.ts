@@ -2,8 +2,8 @@ import { supabase } from '../lib/supabase';
 
 export interface TransferInput {
   productId: string;
-  fromWarehouseId: string;
-  toWarehouseId: string;
+  fromBranchId: string;
+  toBranchId: string;
   quantity: number;
   notes: string;
 }
@@ -22,8 +22,8 @@ export interface TransferListItem {
 export async function recordTransfer(input: TransferInput): Promise<void> {
   const { error } = await supabase.rpc('record_transfer', {
     p_product_id: input.productId,
-    p_from_warehouse: input.fromWarehouseId,
-    p_to_warehouse: input.toWarehouseId,
+    p_from_branch: input.fromBranchId,
+    p_to_branch: input.toBranchId,
     p_quantity: input.quantity,
     p_notes: input.notes,
   });

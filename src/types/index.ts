@@ -233,6 +233,7 @@ export interface Branch {
   name: string;
   address?: string | null;
   active: boolean;
+  warehouse_id?: string | null;
   created_at: string;
 }
 
