@@ -20,12 +20,12 @@ import { SupportPage } from './pages/support/SupportPage';
 import { PlaceholderPage } from './pages/PlaceholderPage';
 import { BarcodePage } from './pages/barcode/BarcodePage';
 import { SalesHistoryPage } from './pages/sales/SalesHistoryPage';
+import { PurchasesPage } from './pages/purchases/PurchasesPage';
 import {
   Warehouse,
   ArrowLeftRight,
   Ticket,
   FileText,
-  ShoppingCart as PurchaseIcon,
 } from 'lucide-react';
 
 function App() {
@@ -109,9 +109,7 @@ function App() {
         path="/purchases"
         element={
           <ProtectedRoute>
-            <MainLayout>
-              <PlaceholderPage title="Compras" description="Registra y gestiona compras a proveedores" icon={<PurchaseIcon size={20} />} />
-            </MainLayout>
+            <MainLayout><PurchasesPage /></MainLayout>
           </ProtectedRoute>
         }
       />
