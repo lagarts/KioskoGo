@@ -179,7 +179,7 @@ export function POSPage() {
 
   const handleSale = async () => {
     if (cart.length === 0 || saving) return;
-    if (selectedPayment === 'cash' && !register) return;
+    if (!register) return;
     if (selectedPayment === 'account' && !selectedCustomer) {
       alert('Elegí un cliente para cargar la venta a cuenta corriente');
       return;
@@ -748,11 +748,11 @@ export function POSPage() {
               </div>
             )}
 
-            {selectedPayment === 'cash' && !register && (
+            {!register && (
               <div className="flex items-start gap-2 bg-yellow-900/20 border border-yellow-800 rounded-lg p-3">
                 <AlertTriangle size={16} className="text-yellow-400 shrink-0 mt-0.5" />
                 <p className="text-xs text-yellow-400">
-                  No hay caja abierta. Abrí la caja en la sección Caja para cobrar en efectivo.
+                  No hay caja abierta. Abrí la caja en la sección Caja para cargar ventas.
                 </p>
               </div>
             )}
@@ -764,7 +764,7 @@ export function POSPage() {
               disabled={
                 saving ||
                 cart.length === 0 ||
-                (selectedPayment === 'cash' && !register) ||
+                !register ||
                 (selectedPayment === 'account' && !selectedCustomer)
               }
             >
