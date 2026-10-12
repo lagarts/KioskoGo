@@ -21,8 +21,8 @@ import { PlaceholderPage } from './pages/PlaceholderPage';
 import { BarcodePage } from './pages/barcode/BarcodePage';
 import { SalesHistoryPage } from './pages/sales/SalesHistoryPage';
 import { PurchasesPage } from './pages/purchases/PurchasesPage';
+import { StockPage } from './pages/stock/StockPage';
 import {
-  Warehouse,
   ArrowLeftRight,
   Ticket,
   FileText,
@@ -118,9 +118,7 @@ function App() {
         path="/stock"
         element={
           <ProtectedRoute>
-            <MainLayout>
-              <PlaceholderPage title="Stock" description="Control de inventario y movimientos de stock" icon={<Warehouse size={20} />} />
-            </MainLayout>
+            <MainLayout><StockPage /></MainLayout>
           </ProtectedRoute>
         }
       />
