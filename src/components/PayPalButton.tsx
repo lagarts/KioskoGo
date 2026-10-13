@@ -73,8 +73,23 @@ export function PayPalButton({ onSuccess, onError }: PayPalButtonProps) {
 
     (async () => {
       try {
-        await loadPaypalScript();
-        if (cancelled || !containerRef.current || !window.paypal) return;
+        await Promise.race([
+          loadPaypalScript(),
+          new Promise((_, reject) =>
+            setTimeout(() => reject(new Error('PayPal tardó demasiado en cargar. Recargá la página.')), 15000)
+          ),
+        ]);
+        if (cancelled) return;
+        if (!containerRef.current) {
+          setError('No se pudo renderizar el botón de PayPal');
+          setLoading(false);
+          return;
+        }
+        if (!window.paypal) {
+          setError('El SDK de PayPal no cargó. Verificá tu conexión o el client-id.');
+          setLoading(false);
+          return;
+        }
 
         window.paypal.Buttons({
           style: { color: 'blue', shape: 'rect', label: 'pay', height: 45 },
