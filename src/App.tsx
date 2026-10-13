@@ -25,7 +25,6 @@ import { StockPage } from './pages/stock/StockPage';
 import { TransfersPage } from './pages/transfers/TransfersPage';
 import {
   Ticket,
-  FileText,
 } from 'lucide-react';
 
 function App() {
@@ -166,17 +165,6 @@ function App() {
         element={
           <ProtectedRoute>
             <MainLayout><PaymentMethodsPage /></MainLayout>
-          </ProtectedRoute>
-        }
-      />
-
-      <Route
-        path="/accounts"
-        element={
-          <ProtectedRoute>
-            <MainLayout>
-              <PlaceholderPage title="Cuentas Corrientes" description="Gestiona créditos y pagos de clientes" icon={<FileText size={20} />} />
-            </MainLayout>
           </ProtectedRoute>
         }
       />
