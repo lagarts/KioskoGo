@@ -24,6 +24,7 @@ import {
 } from '../../services/business.service';
 import { formatDate } from '../../utils/format';
 import { displayUserEmail } from '../../lib/username';
+import { PayPalButton } from '../../components/PayPalButton';
 import type { RubroType, Subscription, User, UserRole } from '../../types';
 
 type SettingsSection =
@@ -300,23 +301,25 @@ function SubscriptionSection() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
-  useEffect(() => {
+  const loadSubscription = useCallback(async () => {
     if (!user?.business_id) return;
-    (async () => {
-      try {
-        const sub = await getSubscription(user.business_id);
-        setSubscription(sub);
-        if (sub?.trial_end) {
-          const diff = new Date(sub.trial_end).getTime() - Date.now();
-          setTrialDaysLeft(Math.max(0, Math.ceil(diff / (1000 * 60 * 60 * 24))));
-        }
-      } catch (err) {
-        setError(err instanceof Error ? err.message : 'Error cargando suscripción');
-      } finally {
-        setLoading(false);
+    try {
+      const sub = await getSubscription(user.business_id);
+      setSubscription(sub);
+      if (sub?.trial_end) {
+        const diff = new Date(sub.trial_end).getTime() - Date.now();
+        setTrialDaysLeft(Math.max(0, Math.ceil(diff / (1000 * 60 * 60 * 24))));
       }
-    })();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Error cargando suscripción');
+    } finally {
+      setLoading(false);
+    }
   }, [user?.business_id]);
+
+  useEffect(() => {
+    void loadSubscription();
+  }, [loadSubscription]);
 
   const statusLabels: Record<string, { label: string; variant: 'success' | 'warning' | 'danger' | 'info' }> = {
     trial: { label: 'Período de prueba', variant: 'warning' },
@@ -420,7 +423,13 @@ function SubscriptionSection() {
               <p>✓ Actualizaciones incluidas</p>
               <p>✓ Sin límite de productos</p>
             </div>
-            <Button variant="secondary" fullWidth className="mt-4">Pagar con PayPal</Button>
+            <div className="mt-4">
+              <PayPalButton
+                onSuccess={() => {
+                  void loadSubscription();
+                }}
+              />
+            </div>
           </div>
         </Card>
       </div>
