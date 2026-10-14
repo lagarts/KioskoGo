@@ -1,9 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
-import { supabase } from '../lib/supabase';
 
 const PAYPAL_CLIENT_ID =
-  'BAAMjXwj_wR5OKM_Xc_KuoBKbZC4JYP5FO7gArJGCTTRVlmNoBNfV7YPMWQlInxaSQVf6dHSjI4rNKs00M';
-const HOSTED_BUTTON_ID = 'F5QJ3NFVJCY7Q';
+  'BAA_86nNbjR8acEiDITrJDpa9UsUJIgyD4iQA55ho-V0x8P0X3dTmQIj7x6h2o8XFpeEmrghx6uahH-CkE';
+const HOSTED_BUTTON_ID = 'SJYTR2QNVLN9E';
 
 declare global {
   interface Window {
@@ -11,7 +10,6 @@ declare global {
       HostedButtons: (options: { hostedButtonId: string }) => {
         render: (selector: string) => void;
       };
-      Buttons?: unknown;
     };
   }
 }
@@ -33,43 +31,54 @@ function loadPaypalSdk(): Promise<void> {
       return;
     }
     const script = document.createElement('script');
-    script.src = `https://www.paypal.com/sdk/js?client-id=${PAYPAL_CLIENT_ID}&components=hosted-buttons&disable-funding=venmo&currency=USD`;
+    script.src = `https://www.paypal.com/sdk/js?client-id=${encodeURIComponent(PAYPAL_CLIENT_ID)}&components=hosted-buttons&disable-funding=venmo&currency=USD`;
     script.setAttribute('data-paypal-sdk', 'true');
     script.async = true;
-    script.onload = () => resolve();
-    script.onerror = () => reject(new Error('No se pudo cargar PayPal'));
+    script.onload = () => {
+      if (window.paypal?.HostedButtons) resolve();
+      else reject(new Error('El SDK de PayPal no inicializó. Verificá el client-id.'));
+    };
+    script.onerror = () => reject(new Error('No se pudo cargar PayPal. Revisá tu conexión.'));
     document.head.appendChild(script);
   });
 }
 
-interface PayPalButtonProps {
-  onSuccess?: () => void;
-}
-
-export function PayPalButton({ onSuccess }: PayPalButtonProps) {
+export function PayPalButton() {
   const containerRef = useRef<HTMLDivElement>(null);
   const [status, setStatus] = useState<'loading' | 'ready' | 'error'>('loading');
   const [errorMsg, setErrorMsg] = useState('');
 
   useEffect(() => {
     let cancelled = false;
+    let renderTimeout: ReturnType<typeof setTimeout> | undefined;
 
     (async () => {
       try {
-        await loadPaypalSdk();
-        if (cancelled) return;
+        await Promise.race([
+          loadPaypalSdk(),
+          new Promise((_, reject) =>
+            setTimeout(() => reject(new Error('PayPal tardó demasiado. Recargá la página.')), 15000)
+          ),
+        ]);
+        if (cancelled || !containerRef.current) return;
         if (!window.paypal?.HostedButtons) {
           setStatus('error');
-          setErrorMsg('El SDK de PayPal no cargó. Recargá la página.');
+          setErrorMsg('El SDK de PayPal no inicializó. Verificá el client-id.');
           return;
         }
+
         const containerId = `paypal-hosted-${Date.now()}`;
-        if (containerRef.current) {
-          containerRef.current.id = containerId;
-        }
+        containerRef.current.id = containerId;
         window.paypal.HostedButtons({ hostedButtonId: HOSTED_BUTTON_ID }).render(`#${containerId}`);
         setStatus('ready');
-        onSuccess?.();
+
+        renderTimeout = setTimeout(() => {
+          const el = containerRef.current;
+          if (el && el.childElementCount === 0) {
+            setStatus('error');
+            setErrorMsg('El botón de PayPal no se pudo renderizar. Recargá la página.');
+          }
+        }, 5000);
       } catch (err) {
         if (!cancelled) {
           setStatus('error');
@@ -80,8 +89,8 @@ export function PayPalButton({ onSuccess }: PayPalButtonProps) {
 
     return () => {
       cancelled = true;
+      if (renderTimeout) clearTimeout(renderTimeout);
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   if (status === 'error') {

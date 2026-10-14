@@ -424,11 +424,7 @@ function SubscriptionSection() {
               <p>✓ Sin límite de productos</p>
             </div>
             <div className="mt-4">
-              <PayPalButton
-                onSuccess={() => {
-                  void loadSubscription();
-                }}
-              />
+              <PayPalButton />
             </div>
           </div>
         </Card>
