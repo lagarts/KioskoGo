@@ -1,28 +1,53 @@
 import { useEffect, useRef, useState } from 'react';
+import { useAuth } from '../contexts/AuthContext';
 
 const PAYPAL_CLIENT_ID =
   'BAA_86nNbjR8acEiDITrJDpa9UsUJIgyD4iQA55ho-V0x8P0X3dTmQIj7x6h2o8XFpeEmrghx6uahH-CkE';
-const HOSTED_BUTTON_ID = 'SJYTR2QNVLN9E';
+const PLAN_AMOUNT = '10.00';
+const PLAN_CURRENCY = 'USD';
 
 declare global {
   interface Window {
     paypal?: {
-      HostedButtons: (options: { hostedButtonId: string }) => {
-        render: (selector: string) => void;
-      };
+      Buttons: (options: {
+        createOrder: (
+          data: Record<string, unknown>,
+          actions: {
+            order: {
+              create: (input: {
+                purchase_units: {
+                  amount: { value: string; currency_code: string };
+                  custom?: string;
+                  description?: string;
+                }[];
+              }) => Promise<string>;
+            };
+          }
+        ) => Promise<string>;
+        onApprove: (
+          data: Record<string, unknown>,
+          actions: {
+            order: {
+              capture: () => Promise<{ id: string; status: string }>;
+            };
+          }
+        ) => Promise<void>;
+        onError: (err: unknown) => void;
+        style?: { color?: string; shape?: string; label?: string; height?: number };
+      }) => { render: (selector: string) => void };
     };
   }
 }
 
-function loadPaypalSdk(): Promise<void> {
+function loadPaypalScript(): Promise<void> {
   return new Promise((resolve, reject) => {
-    if (window.paypal?.HostedButtons) {
+    if (window.paypal?.Buttons) {
       resolve();
       return;
     }
     const existing = document.querySelector<HTMLScriptElement>('script[data-paypal-sdk]');
     if (existing) {
-      if (window.paypal?.HostedButtons) {
+      if (window.paypal?.Buttons) {
         resolve();
         return;
       }
@@ -31,11 +56,11 @@ function loadPaypalSdk(): Promise<void> {
       return;
     }
     const script = document.createElement('script');
-    script.src = `https://www.paypal.com/sdk/js?client-id=${encodeURIComponent(PAYPAL_CLIENT_ID)}&components=hosted-buttons&disable-funding=venmo&currency=USD`;
+    script.src = `https://www.paypal.com/sdk/js?client-id=${encodeURIComponent(PAYPAL_CLIENT_ID)}&components=buttons&currency=${PLAN_CURRENCY}`;
     script.setAttribute('data-paypal-sdk', 'true');
     script.async = true;
     script.onload = () => {
-      if (window.paypal?.HostedButtons) resolve();
+      if (window.paypal?.Buttons) resolve();
       else reject(new Error('El SDK de PayPal no inicializó. Verificá el client-id.'));
     };
     script.onerror = () => reject(new Error('No se pudo cargar PayPal. Revisá tu conexión.'));
@@ -43,33 +68,76 @@ function loadPaypalSdk(): Promise<void> {
   });
 }
 
-export function PayPalButton() {
+interface PayPalButtonProps {
+  onSuccess?: () => void;
+}
+
+export function PayPalButton({ onSuccess }: PayPalButtonProps) {
+  const { user } = useAuth();
   const containerRef = useRef<HTMLDivElement>(null);
-  const [status, setStatus] = useState<'loading' | 'ready' | 'error'>('loading');
+  const [status, setStatus] = useState<'loading' | 'ready' | 'error' | 'paid'>('loading');
   const [errorMsg, setErrorMsg] = useState('');
 
   useEffect(() => {
     let cancelled = false;
     let renderTimeout: ReturnType<typeof setTimeout> | undefined;
+    const businessId = user?.business_id;
 
     (async () => {
       try {
         await Promise.race([
-          loadPaypalSdk(),
+          loadPaypalScript(),
           new Promise((_, reject) =>
             setTimeout(() => reject(new Error('PayPal tardó demasiado. Recargá la página.')), 15000)
           ),
         ]);
         if (cancelled || !containerRef.current) return;
-        if (!window.paypal?.HostedButtons) {
+        if (!window.paypal?.Buttons) {
           setStatus('error');
           setErrorMsg('El SDK de PayPal no inicializó. Verificá el client-id.');
           return;
         }
 
-        const containerId = `paypal-hosted-${Date.now()}`;
-        containerRef.current.id = containerId;
-        window.paypal.HostedButtons({ hostedButtonId: HOSTED_BUTTON_ID }).render(`#${containerId}`);
+        window.paypal.Buttons({
+          style: { color: 'blue', shape: 'rect', label: 'pay', height: 45 },
+          createOrder: (_data, actions) =>
+            actions.order.create({
+              purchase_units: [
+                {
+                  amount: {
+                    value: PLAN_AMOUNT,
+                    currency_code: PLAN_CURRENCY,
+                  },
+                  custom: businessId ?? '',
+                  description: 'Suscripción KioskoGo - Plan Mensual USD',
+                },
+              ],
+            }),
+          onApprove: async (_data, actions) => {
+            try {
+              const details = await actions.order.capture();
+              if (details.status !== 'COMPLETED') {
+                setStatus('error');
+                setErrorMsg('El pago no se completó. Intentá de nuevo.');
+                return;
+              }
+              setStatus('paid');
+              onSuccess?.();
+            } catch (err) {
+              setStatus('error');
+              setErrorMsg(err instanceof Error ? err.message : 'Error procesando el pago');
+            }
+          },
+          onError: (err) => {
+            if (cancelled) return;
+            setStatus('error');
+            setErrorMsg(
+              err instanceof Error ? err.message : 'Hubo un error con PayPal. Intentá de nuevo.'
+            );
+          },
+        });
+
+        if (cancelled) return;
         setStatus('ready');
 
         renderTimeout = setTimeout(() => {
@@ -91,7 +159,16 @@ export function PayPalButton() {
       cancelled = true;
       if (renderTimeout) clearTimeout(renderTimeout);
     };
-  }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user?.business_id]);
+
+  if (status === 'paid') {
+    return (
+      <div className="bg-green-900/30 border border-green-800 text-green-400 text-sm px-4 py-3 rounded-lg text-center">
+        ¡Pago realizado con éxito! Tu suscripción se activará en unos segundos.
+      </div>
+    );
+  }
 
   if (status === 'error') {
     return (
