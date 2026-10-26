@@ -8,18 +8,31 @@ const SUPABASE_URL = Deno.env.get("SUPABASE_URL") ?? "";
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
 const SITE_URL = Deno.env.get("SITE_URL") ?? "https://kiosko-go.vercel.app";
 
+const CORS_HEADERS = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+  "Access-Control-Allow-Methods": "POST, OPTIONS",
+};
+
+function json(data: unknown, status = 200): Response {
+  return new Response(JSON.stringify(data), {
+    status,
+    headers: { ...CORS_HEADERS, "Content-Type": "application/json" },
+  });
+}
+
 Deno.serve(async (req) => {
+  if (req.method === "OPTIONS") {
+    return new Response("ok", { headers: CORS_HEADERS });
+  }
   if (req.method !== "POST") {
-    return new Response("Method not allowed", { status: 405 });
+    return json({ error: "Method not allowed" }, 405);
   }
 
   try {
     const { business_id } = await req.json();
     if (!business_id) {
-      return new Response(JSON.stringify({ error: "Falta business_id" }), {
-        status: 400,
-        headers: { "Content-Type": "application/json" },
-      });
+      return json({ error: "Falta business_id" }, 400);
     }
 
     // Verificar que el usuario autenticado pertenece a ese comercio
@@ -28,10 +41,7 @@ Deno.serve(async (req) => {
     const token = authHeader.replace("Bearer ", "");
     const { data: userData, error: userError } = await supabase.auth.getUser(token);
     if (userError || !userData.user) {
-      return new Response(JSON.stringify({ error: "No autorizado" }), {
-        status: 401,
-        headers: { "Content-Type": "application/json" },
-      });
+      return json({ error: "No autorizado" }, 401);
     }
     const { data: profile } = await supabase
       .from("profiles")
@@ -39,10 +49,7 @@ Deno.serve(async (req) => {
       .eq("id", userData.user.id)
       .maybeSingle();
     if (!profile || profile.business_id !== business_id) {
-      return new Response(JSON.stringify({ error: "No autorizado" }), {
-        status: 401,
-        headers: { "Content-Type": "application/json" },
-      });
+      return json({ error: "No autorizado" }, 401);
     }
 
     const preference = {
@@ -81,22 +88,13 @@ Deno.serve(async (req) => {
     if (!res.ok) {
       const errBody = await res.text();
       console.error("MP preference error:", res.status, errBody);
-      return new Response(JSON.stringify({ error: "Error creando el pago" }), {
-        status: 502,
-        headers: { "Content-Type": "application/json" },
-      });
+      return json({ error: "Error creando el pago" }, 502);
     }
 
     const data = await res.json();
-    return new Response(
-      JSON.stringify({ init_point: data.init_point, id: data.id }),
-      { status: 200, headers: { "Content-Type": "application/json" } }
-    );
+    return json({ init_point: data.init_point, id: data.id });
   } catch (err) {
     console.error("mp-create-preference error:", err);
-    return new Response(JSON.stringify({ error: "Error interno" }), {
-      status: 500,
-      headers: { "Content-Type": "application/json" },
-    });
+    return json({ error: "Error interno" }, 500);
   }
 });
