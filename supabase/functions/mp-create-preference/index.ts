@@ -48,11 +48,11 @@ Deno.serve(async (req) => {
     const preference = {
       items: [
         {
-          id: "kioskogo_monthly_usd",
+          id: "kioskogo_monthly_ars",
           title: "Suscripción KioskoGo - Plan Mensual",
           quantity: 1,
-          unit_price: 10,
-          currency_id: "USD",
+          unit_price: 15000,
+          currency_id: "ARS",
         },
       ],
       payer: {
