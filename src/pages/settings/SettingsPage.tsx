@@ -25,6 +25,7 @@ import {
 import { formatDate } from '../../utils/format';
 import { displayUserEmail } from '../../lib/username';
 import { PayPalButton } from '../../components/PayPalButton';
+import { MPButton } from '../../components/MPButton';
 import type { RubroType, Subscription, User, UserRole } from '../../types';
 
 type SettingsSection =
@@ -409,7 +410,7 @@ function SubscriptionSection() {
               <p>✓ Actualizaciones incluidas</p>
               <p>✓ Sin límite de productos</p>
             </div>
-            <Button fullWidth className="mt-4">Pagar con Mercado Pago</Button>
+            <MPButton />
           </div>
         </Card>
         <Card>
