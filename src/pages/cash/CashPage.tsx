@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   Wallet,
   Lock,
@@ -10,6 +11,7 @@ import {
   Clock,
   User,
   Building2,
+  AlertTriangle,
 } from 'lucide-react';
 import { Card } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
@@ -24,6 +26,8 @@ import {
   listMovements,
 } from '../../services/cash.service';
 import { listBranches } from '../../services/branches.service';
+import { getSubscription } from '../../services/business.service';
+import { checkSubscriptionAccess, type SubscriptionAccess } from '../../utils/subscription';
 import type { Branch, CashMovement, CashRegister } from '../../types';
 
 interface MovementWithUser extends CashMovement {
@@ -34,6 +38,7 @@ const positiveTypes = ['sale_in', 'opening', 'income'];
 
 export function CashPage() {
   const { user } = useAuth();
+  const navigate = useNavigate();
   const [register, setRegister] = useState<CashRegister | null>(null);
   const [movements, setMovements] = useState<MovementWithUser[]>([]);
   const [loading, setLoading] = useState(true);
@@ -45,6 +50,8 @@ export function CashPage() {
   const [showCloseModal, setShowCloseModal] = useState(false);
   const [branches, setBranches] = useState<Branch[]>([]);
   const [selectedBranch, setSelectedBranch] = useState('');
+  const [subBlock, setSubBlock] = useState<SubscriptionAccess | null>(null);
+  const [showSubModal, setShowSubModal] = useState(false);
 
   const loadMovements = useCallback(async (registerId: string) => {
     const data = await listMovements(registerId);
@@ -55,10 +62,14 @@ export function CashPage() {
     (async () => {
       try {
         setError('');
-        const [open, branchList] = await Promise.all([
+        const [open, branchList, sub] = await Promise.all([
           getOpenRegister(),
           listBranches().catch(() => [] as Branch[]),
+          user?.business_id
+            ? getSubscription(user.business_id).catch(() => null)
+            : Promise.resolve(null),
         ]);
+        setSubBlock(checkSubscriptionAccess(sub));
         setBranches(branchList.filter((b) => b.active));
         setSelectedBranch(branchList.find((b) => b.active)?.id ?? '');
         setRegister(open);
@@ -71,10 +82,15 @@ export function CashPage() {
         setLoading(false);
       }
     })();
-  }, [loadMovements]);
+  }, [loadMovements, user?.business_id]);
 
   const handleOpenCash = async () => {
     if (!user || saving) return;
+    if (subBlock?.blocked) {
+      setShowOpenModal(false);
+      setShowSubModal(true);
+      return;
+    }
     if (branches.length > 0 && !selectedBranch) {
       alert('Seleccioná la sucursal de la caja');
       return;
@@ -151,21 +167,67 @@ export function CashPage() {
           </div>
         )}
 
-        <Card>
-          <div className="flex flex-col items-center py-12 text-center">
-            <div className="w-20 h-20 rounded-2xl bg-surface-800 flex items-center justify-center mb-4">
-              <Lock size={36} className="text-surface-500" />
+        {subBlock?.blocked ? (
+          <Card>
+            <div className="flex flex-col items-center py-12 text-center">
+              <div className="w-20 h-20 rounded-2xl bg-red-900/30 flex items-center justify-center mb-4">
+                <AlertTriangle size={36} className="text-red-400" />
+              </div>
+              <h2 className="text-xl font-semibold text-white mb-2">{subBlock.reason}</h2>
+              <p className="text-sm text-surface-400 mb-6 max-w-md">
+                {subBlock.detail} Para abrir caja y operar, aboná la suscripción mensual.
+              </p>
+              <Button size="xl" onClick={() => setShowSubModal(true)}>
+                <AlertTriangle size={20} />
+                IR A SUSCRIPCIÓN
+              </Button>
             </div>
-            <h2 className="text-xl font-semibold text-white mb-2">Caja cerrada</h2>
-            <p className="text-sm text-surface-400 mb-6 max-w-md">
-              No hay una caja abierta. Debes abrir una caja antes de comenzar a vender.
-            </p>
-            <Button size="xl" onClick={() => setShowOpenModal(true)}>
-              <Unlock size={20} />
-              ABRIR CAJA
-            </Button>
+          </Card>
+        ) : (
+          <Card>
+            <div className="flex flex-col items-center py-12 text-center">
+              <div className="w-20 h-20 rounded-2xl bg-surface-800 flex items-center justify-center mb-4">
+                <Lock size={36} className="text-surface-500" />
+              </div>
+              <h2 className="text-xl font-semibold text-white mb-2">Caja cerrada</h2>
+              <p className="text-sm text-surface-400 mb-6 max-w-md">
+                No hay una caja abierta. Debes abrir una caja antes de comenzar a vender.
+              </p>
+              <Button size="xl" onClick={() => setShowOpenModal(true)}>
+                <Unlock size={20} />
+                ABRIR CAJA
+              </Button>
+            </div>
+          </Card>
+        )}
+
+        {showSubModal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            <div className="absolute inset-0 bg-black/70" onClick={() => setShowSubModal(false)} />
+            <div className="relative bg-surface-900 border border-red-800 rounded-2xl w-full max-w-md p-6 space-y-4">
+              <div className="flex flex-col items-center text-center gap-3">
+                <div className="w-16 h-16 rounded-2xl bg-red-900/30 flex items-center justify-center">
+                  <AlertTriangle size={32} className="text-red-400" />
+                </div>
+                <h2 className="text-xl font-bold text-white">
+                  {subBlock?.reason ?? 'Suscripción impaga'}
+                </h2>
+                <p className="text-sm text-surface-400">
+                  {subBlock?.detail ??
+                    'Tu suscripción está vencida. Para abrir caja y seguir operando, aboná la suscripción mensual.'}
+                </p>
+              </div>
+              <div className="flex gap-3">
+                <Button variant="secondary" fullWidth onClick={() => setShowSubModal(false)}>
+                  Cerrar
+                </Button>
+                <Button fullWidth onClick={() => navigate('/settings')}>
+                  IR A SUSCRIPCIÓN
+                </Button>
+              </div>
+            </div>
           </div>
-        </Card>
+        )}
 
         {showOpenModal && (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
